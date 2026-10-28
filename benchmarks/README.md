@@ -34,11 +34,14 @@ produce `5000050000`) and never times an unused or eliminated computation.
 
 ## Baseline vs. optimized (this machine: i5-1145G7, OpenBLAS)
 
-| workload | baseline | optimized | speedup |
+| workload | baseline | level 1 | level 2 (JIT) |
 | --- | --- | --- | --- |
-| scalar loop 100k | ~644 ms | ~71 ms | ~9x |
-| linear solve 2x2 | ~0.88 ms | ~0.14 ms | ~6x |
+| scalar loop 100k | ~644 ms | ~76 ms | ~18 ms |
+| linear solve 2x2 | ~0.88 ms | ~0.16 ms | — |
+| indexed assignment 100k | ~5.47 s | ~1.18 s | — |
 | full compile | ~0.55 ms | ~0.55 ms (uncached) | — |
-| cached compile | — | ~1 us | ~500x |
-| 200x200 matmul | ~4.0 ms | ~4.0 ms | BLAS-bound |
-| repeated compile+execute | ~1.04 ms | ~0.21 ms | ~5x (cache) |
+| cached compile | — | ~1 us | — |
+| 200x200 matmul | ~4.0 ms | ~2.5 ms (BLAS-bound) | — |
+
+Run `benchmarks/workbenches.py` for the five targeted before/after and
+MALT-vs-NumPy/SciPy comparisons.

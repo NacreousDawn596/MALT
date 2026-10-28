@@ -21,9 +21,10 @@ PROGRAMS = [
 
 
 def _run_levels(src: str):
-    u0 = compile_source(src, "t.m", optimization_level=0)
-    u1 = compile_source(src, "t.m", optimization_level=1)
-    return execute(u0), execute(u1)
+    return [
+        execute(compile_source(src, "t.m", optimization_level=lvl))
+        for lvl in (0, 1, 2)
+    ]
 
 
 _CONSTANTS = {"pi", "eps", "Inf", "NaN", "true", "false", "i", "j"}
@@ -42,23 +43,25 @@ def _vals(ns):
 
 @pytest.mark.parametrize("src", PROGRAMS)
 def test_optimization_levels_equivalent(src):
-    ns0, ns1 = _run_levels(src)
-    v0, v1 = _vals(ns0), _vals(ns1)
-    assert set(v0) == set(v1)
-    for name in v0:
-        a, b = v0[name], v1[name]
-        if isinstance(a, np.ndarray) or isinstance(b, np.ndarray):
-            np.testing.assert_allclose(
-                np.asarray(a, dtype=complex), np.asarray(b, dtype=complex), atol=1e-12
-            )
-        else:
-            assert a == b or abs(float(a) - float(b)) < 1e-12
+    namespaces = _run_levels(src)
+    reference = _vals(namespaces[0])
+    for ns in namespaces[1:]:
+        v = _vals(ns)
+        assert set(reference) == set(v)
+        for name in reference:
+            a, b = reference[name], v[name]
+            if isinstance(a, np.ndarray) or isinstance(b, np.ndarray):
+                np.testing.assert_allclose(
+                    np.asarray(a, dtype=complex), np.asarray(b, dtype=complex), atol=1e-12
+                )
+            else:
+                assert a == b or abs(float(a) - float(b)) < 1e-12
 
 
 def test_optimization_level_0_is_slow_path():
     # Level 0 keeps scalars as 1x1 arrays; level 1 uses native scalars.
     src = "a = 1 + 2;\n"
-    ns0, _ = _run_levels(src)
+    ns0 = _run_levels(src)[0]
     assert isinstance(ns0["a"], np.ndarray)
 
 

@@ -45,6 +45,20 @@ _UNARY = {
     ".'": "transpose",
 }
 
+# Native Python operators for inlined scalar arithmetic inside JIT-specialized
+# loop bodies. ``\`` and ``.\`` are excluded (left division is not a Python
+# binary operator) and fall back to the runtime dispatch.
+_SCALAR_INLINE_BINOP = {
+    "+": "+",
+    "-": "-",
+    "*": "*",
+    ".*": "*",
+    "./": "/",
+    "/": "/",
+    ".^": "**",
+    "^": "**",
+}
+
 _AUGMENT_BASE = {
     "+=": "+",
     "-=": "-",
@@ -105,7 +119,7 @@ _BARE_FUNCTIONS = frozenset({"gcf", "gca"})
 
 
 class CodeGenerator:
-    def __init__(self, filename: str = "<malt>") -> None:
+    def __init__(self, filename: str = "<malt>", optimization_level: int = 1) -> None:
         self.filename = filename
         self.lines: list[str] = []
         self.indent = 0
@@ -115,6 +129,8 @@ class CodeGenerator:
         self._end_dim: int = 0
         self._function_outputs: list[str] | None = None
         self.source_map: list[tuple[int, object]] = []  # (generated line, location)
+        self.optimization_level = optimization_level
+        self.inline_scalar = False
 
     # -- low-level emission -------------------------------------------------
     def emit(self, line: str = "") -> None:
@@ -159,6 +175,8 @@ class CodeGenerator:
         if isinstance(node, ast.CellLiteral):
             raise SemanticError("cell arrays are not supported", node.location)
         if isinstance(node, ast.UnaryOperation):
+            if self.inline_scalar and node.op in ("-", "+"):
+                return f"({node.op}{self.gen_expr(node.operand)})"
             fn = _UNARY.get(node.op)
             if fn is None:
                 raise CodegenError(f"unknown unary operator {node.op!r}", node.location)
@@ -173,6 +191,10 @@ class CodeGenerator:
                 return (
                     f"(1.0 if (_ml.is_true({la}) {op} _ml.is_true({rb})) else 0.0)"
                 )
+            if self.inline_scalar and node.op in _SCALAR_INLINE_BINOP:
+                la = self.gen_expr(node.left)
+                rb = self.gen_expr(node.right)
+                return f"({la} {_SCALAR_INLINE_BINOP[node.op]} {rb})"
             fn = _BINOP.get(node.op)
             if fn is None:
                 raise CodegenError(f"unknown operator {node.op!r}", node.location)
@@ -429,28 +451,109 @@ class CodeGenerator:
             kw = "if" if i == 0 else "elif"
             self.emit(f"{kw} _ml.is_true({self.gen_expr(cond)}):")
             self.indent += 1
+            if not body:
+                self.emit("pass")
             for s in body:
                 self.gen_statement(s)
             self.indent -= 1
         if node.else_body is not None:
             self.emit("else:")
             self.indent += 1
+            if not node.else_body:
+                self.emit("pass")
             for s in node.else_body:
                 self.gen_statement(s)
             self.indent -= 1
 
     def _gen_for(self, node: ast.ForStatement) -> None:
         self._check_identifier(node.var, node)
+        if self.optimization_level >= 2 and self._try_gen_for_jit(node):
+            return
         it = self.gen_expr(node.iterable)
         self.emit(f"for {node.var} in _ml.for_columns({it}):")
         self.indent += 1
+        if not node.body:
+            self.emit("pass")
         for s in node.body:
             self.gen_statement(s)
         self.indent -= 1
 
+    def _try_gen_for_jit(self, node: ast.ForStatement) -> bool:
+        """JIT-specialize ``for k = a:s:b`` scalar accumulation loops.
+
+        Only the provably scalar reduction pattern is specialized: a single
+        assignment ``X = X op <scalar expr over k only>``. The RHS may not
+        reference the accumulator, so a matrix ``X`` only ever combines with a
+        scalar (element-wise in both MATLAB and native Python), which is safe.
+        The loop body is emitted as a native-arithmetic Python function and the
+        range is specialized to ``range``/``colon`` at runtime by
+        ``_ml.jit_for``.
+        """
+        if not isinstance(node.iterable, ast.ColonExpression):
+            return False
+        if len(node.body) != 1:
+            return False
+        stmt = node.body[0]
+        if not isinstance(stmt, ast.Assignment) or stmt.op != "=":
+            return False
+        if len(stmt.targets) != 1 or not isinstance(stmt.targets[0], ast.Identifier):
+            return False
+        target = stmt.targets[0].name
+        self._check_identifier(target, stmt)
+        value = stmt.value
+        # Accumulation form X = X op rhs(k), rhs must not reference X.
+        if not isinstance(value, ast.BinaryOperation):
+            return False
+        if value.op not in _SCALAR_INLINE_BINOP:
+            return False
+        if not isinstance(value.left, ast.Identifier) or value.left.name != target:
+            return False
+        if not self._is_scalar_expr(value.right, {node.var}):
+            return False
+
+        fn_name = self.new_temp()
+        self.emit(f"def {fn_name}({target}, {node.var}):")
+        self.indent += 1
+        old_inline = self.inline_scalar
+        self.inline_scalar = True
+        try:
+            expr = self.gen_expr(value)
+        finally:
+            self.inline_scalar = old_inline
+        self.emit(f"return {expr}")
+        self.indent -= 1
+
+        start = self.gen_expr(node.iterable.start)
+        end = self.gen_expr(node.iterable.end)
+        if node.iterable.step is not None:
+            step = self.gen_expr(node.iterable.step)
+        else:
+            step = "1.0"
+        self.emit(
+            f"{target}, {node.var} = _ml.jit_for({target}, {start}, {step}, {end}, {fn_name})"
+        )
+        return True
+
+    def _is_scalar_expr(self, node: ast.Node, allowed: set[str]) -> bool:
+        if isinstance(node, (ast.NumberLiteral, ast.LogicalLiteral)):
+            return True
+        if isinstance(node, ast.Identifier):
+            return node.name in allowed
+        if isinstance(node, ast.UnaryOperation):
+            return node.op in ("-", "+") and self._is_scalar_expr(node.operand, allowed)
+        if isinstance(node, ast.BinaryOperation):
+            if node.op not in _SCALAR_INLINE_BINOP:
+                return False
+            return self._is_scalar_expr(node.left, allowed) and self._is_scalar_expr(
+                node.right, allowed
+            )
+        return False
+
     def _gen_while(self, node: ast.WhileStatement) -> None:
         self.emit(f"while _ml.is_true({self.gen_expr(node.condition)}):")
         self.indent += 1
+        if not node.body:
+            self.emit("pass")
         for s in node.body:
             self.gen_statement(s)
         self.indent -= 1
@@ -462,12 +565,16 @@ class CodeGenerator:
             kw = "if" if i == 0 else "elif"
             self.emit(f"{kw} {self._switch_cond(t, test)}:")
             self.indent += 1
+            if not body:
+                self.emit("pass")
             for s in body:
                 self.gen_statement(s)
             self.indent -= 1
         if node.otherwise is not None:
             self.emit("else:")
             self.indent += 1
+            if not node.otherwise:
+                self.emit("pass")
             for s in node.otherwise:
                 self.gen_statement(s)
             self.indent -= 1
@@ -489,7 +596,11 @@ class CodeGenerator:
             self.emit("raise _ml.ReturnSignal()")
 
 
-def generate(statements: list[ast.Statement], filename: str = "<malt>") -> tuple[str, list[tuple[int, object]]]:
-    gen = CodeGenerator(filename)
+def generate(
+    statements: list[ast.Statement],
+    filename: str = "<malt>",
+    optimization_level: int = 1,
+) -> tuple[str, list[tuple[int, object]]]:
+    gen = CodeGenerator(filename, optimization_level=optimization_level)
     source = gen.gen_program(statements)
     return source, gen.source_map

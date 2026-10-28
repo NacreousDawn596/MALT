@@ -54,16 +54,21 @@ MPLBACKEND=Qt5Agg nix develop -c python -m malt run examples/graphics/sine_plot.
 malt eval "expression"          # evaluate a MATLAB expression
 malt run program.m              # run a MATLAB script
 malt run program.m --show-generated
-malt run program.m --optimization-level 0|1
+malt run program.m --optimization-level 0|1|2
 malt compile program.m          # emit generated Python to stdout
 malt compile program.m -o out.py
 malt repl                       # interactive session
 ```
 
+`--optimization-level` selects execution strategy: `0` = 1x1-array scalars
+(reference), `1` = native-scalar fast paths (default), `2` = JIT-specialized
+scalar loops.
+
 ## Benchmarks
 
 ```bash
-nix develop -c python benchmarks/run.py
+nix develop -c python benchmarks/run.py        # full suite
+nix develop -c python benchmarks/workbenches.py # targeted before/after + NumPy comparisons
 ```
 
 See `benchmarks/README.md` for methodology and measured numbers.

@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 
 from ..errors import IndexError_, RuntimeError_
-from .arrays import _config, as_array
+from .arrays import _config, as_array, py_scalar
 
 # Sentinel for the ``:`` colon argument.
 COLON = slice(None)
@@ -70,8 +70,18 @@ def index(A: Any, *subs: Any) -> Any:
             return _string_index(a, subs[0])
         raise IndexError_("too many indices for a string")
     if len(subs) == 1:
+        if _config.optimized:
+            i = _scalar_idx(subs[0], a.size)
+            if i is not None:
+                return _fast_linear_read(a, i)
         return _linear_index(a, subs[0])
     return _subscript_index(a, list(subs))
+
+
+def _fast_linear_read(a: np.ndarray, i: int) -> Any:
+    """Column-major linear scalar read returning a native Python scalar."""
+    v = a.reshape(-1, order="F")[i]
+    return v.item() if isinstance(v, np.generic) else v
 
 
 def _string_index(s: str, sub: Any) -> str:
@@ -175,6 +185,11 @@ def assign(A: Any, value: Any, *subs: Any) -> np.ndarray:
     a = as_array(A)
     if isinstance(a, str):
         raise IndexError_("cannot index-assign into a string")
+    if len(subs) == 1 and _config.optimized:
+        i = _scalar_idx(subs[0], a.size)
+        if i is not None:
+            _set_linear(a, i, py_scalar(value))
+            return a
     value = as_array(value)
     if len(subs) == 1:
         _linear_assign(a, value, subs[0])

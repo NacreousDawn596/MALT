@@ -66,6 +66,7 @@ from .arrays import (  # noqa: E402
     is_string,
     is_true,
     isequal,
+    jit_for,
     length,
     linspace,
     logspace,

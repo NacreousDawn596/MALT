@@ -110,13 +110,21 @@ test suite inspects real Matplotlib artists, not printed output.
   operation. `for_columns` yields native scalars for row-vector loop ranges.
 - **Indexing fast paths.** Scalar subscripts are bounds-checked and applied
   without `astype`/`flatten`/min-max machinery.
+- **JIT-specialized scalar loops (level 2).** A `for k = a:s:b` loop whose body
+  is a single scalar accumulation `X = X op f(k)` (RHS may not reference `X`)
+  is lowered to a native-arithmetic Python function and driven by
+  `_ml.jit_for`, which selects a Python `range` for integer ranges and falls
+  back to `colon`/`for_columns` otherwise. This is conservative and
+  semantically safe: the accumulator only ever combines with the scalar loop
+  variable, which is element-wise in both MATLAB and native Python.
 - **Compilation cache.** `compile_source` memoizes immutable artifacts (AST,
   generated source, code object, source map) keyed on
   `(source, filename, optimization_level)`; execution results and workspaces
   are never cached.
-- **Optimization toggle.** `malt run --optimization-level 0|1` disables/enables
-  the native-scalar fast paths. Level 0 keeps scalars as 1x1 arrays (the slow,
-  always-correct reference); level 1 (default) uses native scalars. Both levels
-  are covered by differential tests.
+- **Optimization toggle.** `malt run --optimization-level 0|1|2`.
+  Level 0 keeps scalars as 1x1 arrays (the slow, always-correct reference);
+  level 1 uses native-scalar fast paths; level 2 additionally enables the
+  JIT-specialized loop lowering. All three levels are covered by differential
+  tests.
 
 See `benchmarks/README.md` for measured before/after numbers and methodology.
