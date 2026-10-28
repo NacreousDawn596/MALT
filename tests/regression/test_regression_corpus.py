@@ -13,10 +13,9 @@ import os
 
 import numpy as np
 import pytest
-
 from conftest import arr, run_file, scalar
 
-from malt.errors import IndexError_, MaltError
+from malt.errors import IndexError_
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures")
 
