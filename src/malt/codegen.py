@@ -92,7 +92,7 @@ _BUILTINS = frozenset(
         "imagesc", "image", "colorbar", "contour", "contourf", "mesh", "surf",
         "view", "saveas", "exportgraphics", "who", "whos", "help",
         "struct", "fieldnames", "isfield", "iscell", "isstruct", "getfield",
-        "setfield",
+        "setfield", "feval", "func2str", "str2func",
     }
 )
 
@@ -222,7 +222,7 @@ class CodeGenerator:
                 self._check_identifier(name, node)
                 return name
             if name in _BUILTINS or name in _MULTIOUT:
-                return f"_ml.{name}"
+                return f"_ml.make_handle({name!r}, _ml.{name})"
             raise SemanticError(f"unknown function '{name}'", node.location)
         if isinstance(node, ast.FieldAccess):
             self._check_identifier(node.field, node)

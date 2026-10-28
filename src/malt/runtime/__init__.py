@@ -191,6 +191,7 @@ from .graphics import (  # noqa: E402
     zlabel,
     zlim,
 )
+from .handles import FunctionHandle  # noqa: E402
 from .indexing import COLON, assign, call, end_, index  # noqa: E402
 from .io import (  # noqa: E402
     clc,
@@ -311,6 +312,35 @@ def setfield(obj: Any, name: str, value: Any) -> Struct:
         )
     obj._fields[name] = as_array(value)
     return obj
+
+
+def make_handle(name: str, fn: Any) -> FunctionHandle:
+    return FunctionHandle(name, fn)
+
+
+def func2str(h: Any) -> str:
+    if isinstance(h, FunctionHandle):
+        return h.name
+    if callable(h) and hasattr(h, "__name__"):
+        return h.__name__
+    raise RuntimeError_("func2str requires a function handle")
+
+
+def str2func(name: Any) -> FunctionHandle:
+    if not isinstance(name, str):
+        raise RuntimeError_("str2func requires a string")
+    fn = globals().get(name)
+    if fn is None:
+        raise RuntimeError_(f"str2func: unknown function '{name}'")
+    return FunctionHandle(name, fn)
+
+
+def feval(h: Any, *args: Any) -> Any:
+    if isinstance(h, FunctionHandle):
+        return h(*args)
+    if callable(h):
+        return h(*args)
+    raise RuntimeError_("feval requires a function handle")
 
 
 def who() -> None:
