@@ -116,6 +116,15 @@ class FieldAccess(Node):
 
 
 @dataclass
+class CellIndexExpression(Node):
+    """Brace indexing ``c{idx}``: accesses the *content* of a cell array."""
+
+    base: Node
+    indices: list[Node]
+    location: SourceLocation
+
+
+@dataclass
 class FunctionHandle(Node):
     """A function handle: either a named function or an anonymous function."""
 
@@ -231,6 +240,7 @@ __all__ = [
     "AnonymousFunction",
     "FunctionHandle",
     "FieldAccess",
+    "CellIndexExpression",
     "Statement",
     "Assignment",
     "ExpressionStatement",

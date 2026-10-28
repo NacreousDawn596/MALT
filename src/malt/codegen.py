@@ -91,6 +91,8 @@ _BUILTINS = frozenset(
         "stairs", "semilogy", "semilogx", "loglog", "errorbar", "fill",
         "imagesc", "image", "colorbar", "contour", "contourf", "mesh", "surf",
         "view", "saveas", "exportgraphics", "who", "whos", "help",
+        "struct", "fieldnames", "isfield", "iscell", "isstruct", "getfield",
+        "setfield",
     }
 )
 
@@ -174,7 +176,9 @@ class CodeGenerator:
         if isinstance(node, ast.MatrixLiteral):
             return self._gen_matrix(node)
         if isinstance(node, ast.CellLiteral):
-            raise SemanticError("cell arrays are not supported", node.location)
+            return self._gen_cell(node)
+        if isinstance(node, ast.CellIndexExpression):
+            return self._gen_cell_index(node)
         if isinstance(node, ast.UnaryOperation):
             if self.inline_scalar and node.op in ("-", "+"):
                 return f"({node.op}{self.gen_expr(node.operand)})"
@@ -236,6 +240,23 @@ class CodeGenerator:
             elems = ", ".join(self.gen_expr(e) for e in row)
             rows.append(f"[{elems}]")
         return f"_ml.matrix([{', '.join(rows)}])"
+
+    def _gen_cell(self, node: ast.CellLiteral) -> str:
+        rows = []
+        for row in node.rows:
+            elems = ", ".join(self.gen_expr(e) for e in row)
+            rows.append(f"[{elems}]")
+        return f"_ml.cell_literal([{', '.join(rows)}])"
+
+    def _gen_cell_index(self, node: ast.CellIndexExpression) -> str:
+        base = self.gen_expr(node.base)
+        subs = []
+        if len(node.indices) == 1:
+            subs.append(self._gen_subscript(node.indices[0], base, 0))
+        else:
+            for i, a in enumerate(node.indices):
+                subs.append(self._gen_subscript(a, base, i + 1))
+        return f"_ml.cell_index({base}, {', '.join(subs)})"
 
     def _gen_anon(self, node: ast.AnonymousFunction) -> str:
         for p in node.params:
@@ -407,6 +428,21 @@ class CodeGenerator:
             # indexed assignment: A(i, j) = value
             self._check_identifier(t.name, t)
             self._gen_index_assign(t.name, t.args, rhs, node.suppress)
+        elif isinstance(t, ast.CellIndexExpression):
+            # brace assignment: c{i} = value
+            base = self.gen_expr(t.base)
+            subs = []
+            if len(t.indices) == 1:
+                subs.append(self._gen_subscript(t.indices[0], base, 0))
+            else:
+                for i, a in enumerate(t.indices):
+                    subs.append(self._gen_subscript(a, base, i + 1))
+            self.emit(f"_ml.cell_assign({base}, {rhs}, {', '.join(subs)})")
+        elif isinstance(t, ast.FieldAccess):
+            # struct field assignment: s.field = value
+            base = self.gen_expr(t.base)
+            self._check_identifier(t.field, t)
+            self.emit(f"_ml.setfield({base}, {t.field!r}, {rhs})")
         else:
             raise SemanticError("invalid assignment target", t.location)
 

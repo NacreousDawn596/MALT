@@ -158,7 +158,7 @@ class Parser:
                     if not isinstance(t, (ast.Identifier, ast.FunctionCall)):
                         self.error("invalid assignment target", t.location)
                 return ast.Assignment(targets, value, op, lhs.location)
-            if isinstance(lhs, (ast.Identifier, ast.FunctionCall)):
+            if isinstance(lhs, (ast.Identifier, ast.FunctionCall, ast.CellIndexExpression, ast.FieldAccess)):
                 return ast.Assignment([lhs], value, op, lhs.location)
             self.error("invalid assignment target", lhs.location)
 
@@ -502,8 +502,28 @@ class Parser:
                 field = self.expect(TokenType.IDENT, "expected field name after '.'")
                 node = ast.FieldAccess(node, str(field.value), dot.location)
                 continue
+            if self.peek().type == TokenType.LBRACE:
+                brace = self.advance()
+                args = self.parse_brace_args()
+                node = ast.CellIndexExpression(node, args, brace.location)
+                continue
             break
         return node
+
+    def parse_brace_args(self) -> list[ast.Node]:
+        self.skip_newlines()
+        args: list[ast.Node] = []
+        if self.match(TokenType.RBRACE):
+            return args
+        while True:
+            self.skip_newlines()
+            args.append(self.parse_expression())
+            self.skip_newlines()
+            if self.match(TokenType.COMMA):
+                continue
+            break
+        self.expect(TokenType.RBRACE, "expected '}' after arguments")
+        return args
 
     def parse_primary(self) -> ast.Node:
         tok = self.peek()

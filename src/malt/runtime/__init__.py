@@ -82,6 +82,18 @@ from .arrays import (  # noqa: E402
     size,
 )
 from .calculus import fzero, integral, roots  # noqa: E402
+from .cells import (  # noqa: E402
+    Cell,
+    Struct,
+    cell_assign,
+    cell_index,
+    cell_literal,
+    fieldnames,
+    iscell,
+    isfield,
+    isstruct,
+    struct,
+)
 from .functions import (  # noqa: E402
     abs,
     acos,
@@ -277,12 +289,28 @@ def catch_error(e: BaseException) -> MaltCatchError:
 
 
 def getfield(obj: Any, name: str) -> Any:
-    """Field access (``obj.field``). Currently supported only on error values."""
+    """Field access (``obj.field``). Supported on structs and error values."""
+    if isinstance(obj, Struct):
+        fields = obj._fields
+        if name in fields:
+            return fields[name]
+        raise RuntimeError_(f"reference to non-existent field '{name}'")
     if isinstance(obj, MaltCatchError):
         return getattr(obj, name)
     raise RuntimeError_(
-        f"field access '.' is only supported on error values, not {type(obj).__name__}"
+        f"field access '.' is only supported on structs and error values, "
+        f"not {type(obj).__name__}"
     )
+
+
+def setfield(obj: Any, name: str, value: Any) -> Struct:
+    """Field assignment (``obj.field = value``). Requires a struct."""
+    if not isinstance(obj, Struct):
+        raise RuntimeError_(
+            f"field assignment '.' requires a struct, not {type(obj).__name__}"
+        )
+    obj._fields[name] = as_array(value)
+    return obj
 
 
 def who() -> None:

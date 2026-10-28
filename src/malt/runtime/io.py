@@ -9,6 +9,7 @@ from typing import Any
 import numpy as np
 
 from .arrays import as_array
+from .cells import Cell, Struct
 
 
 def _fmt_scalar(v: Any) -> str:
@@ -32,6 +33,10 @@ def _fmt_real(v: float) -> str:
 
 def format_array(x: Any) -> str:
     """Format a numeric array in a MATLAB-like column-aligned layout."""
+    if isinstance(x, Cell):
+        return _format_cell(x)
+    if isinstance(x, Struct):
+        return _format_struct(x)
     a = as_array(x)
     if isinstance(a, str):
         return a
@@ -44,6 +49,26 @@ def format_array(x: Any) -> str:
             parts.append(f"(:,:,{k + 1}) =\n{_format_2d(a[:, :, k])}")
         return "\n\n".join(parts)
     return _format_2d(a)
+
+
+def _format_cell(c: Cell) -> str:
+    rows = []
+    data = c._data
+    for i in range(data.shape[0]):
+        parts = []
+        for j in range(data.shape[1]):
+            parts.append(f"[{format_array(data[i, j])}]")
+        rows.append("{" + ", ".join(parts) + "}")
+    return "\n".join(rows)
+
+
+def _format_struct(s: Struct) -> str:
+    lines = []
+    for name, val in s._fields.items():
+        lines.append(f"    {name}: {format_array(val)}")
+    if not lines:
+        return "struct with no fields"
+    return "struct with fields:\n" + "\n".join(lines)
 
 
 def _format_2d(a: np.ndarray) -> str:
