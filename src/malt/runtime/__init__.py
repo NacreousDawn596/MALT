@@ -12,6 +12,7 @@ from typing import Any
 
 import numpy as np
 
+from ..errors import RuntimeError_  # noqa: E402
 from . import arrays as _arrays
 from . import calculus as _calculus
 from . import functions as _functions
@@ -250,6 +251,38 @@ def clear(*names: Any) -> None:
         return
     for n in names:
         ns.pop(str(n), None)
+
+
+class MaltCatchError:
+    """The value bound to a ``catch err`` variable.
+
+    Exposes ``.message`` and ``.identifier``, mirroring the two most useful
+    fields of MATLAB's ``MException`` (see ``docs/specs/try-catch.md``).
+    """
+
+    __slots__ = ("message", "identifier")
+
+    def __init__(self, message: str, identifier: str) -> None:
+        self.message = message
+        self.identifier = identifier
+
+
+def catch_error(e: BaseException) -> MaltCatchError:
+    """Normalize a caught Python exception into a MALT error value."""
+    from ..errors import MaltError
+
+    if isinstance(e, MaltError):
+        return MaltCatchError(e.message, e.category)
+    return MaltCatchError(str(e), type(e).__name__)
+
+
+def getfield(obj: Any, name: str) -> Any:
+    """Field access (``obj.field``). Currently supported only on error values."""
+    if isinstance(obj, MaltCatchError):
+        return getattr(obj, name)
+    raise RuntimeError_(
+        f"field access '.' is only supported on error values, not {type(obj).__name__}"
+    )
 
 
 def who() -> None:

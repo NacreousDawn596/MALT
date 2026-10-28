@@ -91,10 +91,12 @@ docs/        architecture, language-support, nixos, testing
 
 ## Documentation
 
+- [Language semantics](docs/semantics.md) — the normative language reference
 - [Architecture](docs/architecture.md)
 - [Supported language features](docs/language-support.md)
 - [NixOS setup](docs/nixos.md)
 - [Testing](docs/testing.md)
+- [Feature specifications](docs/specs/) — try/catch, cell arrays, structs
 
 ## Status
 

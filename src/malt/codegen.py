@@ -129,6 +129,7 @@ class CodeGenerator:
         self._end_dim: int = 0
         self._function_outputs: list[str] | None = None
         self.source_map: list[tuple[int, object]] = []  # (generated line, location)
+        self.diagnostics: list[dict] = []  # per-loop JIT specialization decisions
         self.optimization_level = optimization_level
         self.inline_scalar = False
 
@@ -219,6 +220,9 @@ class CodeGenerator:
             if name in _BUILTINS or name in _MULTIOUT:
                 return f"_ml.{name}"
             raise SemanticError(f"unknown function '{name}'", node.location)
+        if isinstance(node, ast.FieldAccess):
+            self._check_identifier(node.field, node)
+            return f"_ml.getfield({self.gen_expr(node.base)}, {node.field!r})"
         raise CodegenError(f"cannot generate code for {type(node).__name__}", node.location)
 
     def _num(self, value: object) -> str:
@@ -330,6 +334,8 @@ class CodeGenerator:
             self._gen_while(node)
         elif isinstance(node, ast.SwitchStatement):
             self._gen_switch(node)
+        elif isinstance(node, ast.TryStatement):
+            self._gen_try(node)
         elif isinstance(node, ast.BreakStatement):
             self.emit("break")
         elif isinstance(node, ast.ContinueStatement):
@@ -467,8 +473,18 @@ class CodeGenerator:
 
     def _gen_for(self, node: ast.ForStatement) -> None:
         self._check_identifier(node.var, node)
-        if self.optimization_level >= 2 and self._try_gen_for_jit(node):
-            return
+        if self.optimization_level >= 2:
+            reason = self._try_gen_for_jit(node)
+            self.diagnostics.append(
+                {
+                    "line": node.location.line,
+                    "var": node.var,
+                    "jit": reason is None,
+                    "reason": reason,
+                }
+            )
+            if reason is None:
+                return
         it = self.gen_expr(node.iterable)
         self.emit(f"{node.var} = _ml.for_init()")
         self.emit(f"for {node.var} in _ml.for_columns({it}):")
@@ -479,7 +495,7 @@ class CodeGenerator:
             self.gen_statement(s)
         self.indent -= 1
 
-    def _try_gen_for_jit(self, node: ast.ForStatement) -> bool:
+    def _try_gen_for_jit(self, node: ast.ForStatement) -> str | None:
         """JIT-specialize ``for k = a:s:b`` scalar reduction loops.
 
         Each body statement must be a scalar accumulation ``X = X op f(k)``
@@ -488,30 +504,35 @@ class CodeGenerator:
         scalar, which is element-wise in both MATLAB and native Python).
         Single accumulators use ``_ml.jit_for``; multiple distinct accumulators
         use ``_ml.jit_loop``. Everything else falls back to the general loop.
+
+        Returns ``None`` on success, or a human-readable reason for falling
+        back.
         """
         if not isinstance(node.iterable, ast.ColonExpression):
-            return False
+            return "iterable is not a colon range (a:s:b)"
         if not node.body:
-            return False
+            return "empty loop body"
         accs: list[tuple[str, ast.BinaryOperation]] = []
         for stmt in node.body:
             if not isinstance(stmt, ast.Assignment) or stmt.op != "=":
-                return False
+                return f"non-assignment statement in body ({type(stmt).__name__})"
             if len(stmt.targets) != 1 or not isinstance(stmt.targets[0], ast.Identifier):
-                return False
+                return "multi-target or non-identifier assignment target"
             target = stmt.targets[0].name
-            if target == node.var or target in [a for a, _ in accs]:
-                return False
+            if target == node.var:
+                return "assigns the loop variable"
+            if target in [a for a, _ in accs]:
+                return f"accumulator '{target}' assigned more than once"
             self._check_identifier(target, stmt)
             value = stmt.value
             if not isinstance(value, ast.BinaryOperation):
-                return False
+                return f"body value is not an accumulation ({type(value).__name__})"
             if value.op not in _SCALAR_INLINE_BINOP:
-                return False
+                return f"operator '{value.op}' is not inlinable"
             if not isinstance(value.left, ast.Identifier) or value.left.name != target:
-                return False
+                return "accumulation is not of the form X = X op …"
             if not self._is_scalar_expr(value.right, {node.var}):
-                return False
+                return f"RHS references variables other than '{node.var}'"
             accs.append((target, value))
 
         names = [a for a, _ in accs]
@@ -546,7 +567,7 @@ class CodeGenerator:
                 f"{tmp}, {node.var} = _ml.jit_loop({tup}, {start}, {step}, {end}, {fn_name})"
             )
             self.emit(f"{', '.join(names)} = {tmp}")
-        return True
+        return None
 
     def _is_scalar_expr(self, node: ast.Node, allowed: set[str]) -> bool:
         if isinstance(node, (ast.NumberLiteral, ast.LogicalLiteral)):
@@ -602,6 +623,23 @@ class CodeGenerator:
             return " or ".join(parts) if parts else "False"
         return f"_ml.is_true(_ml.isequal({t}, {self.gen_expr(test)}))"
 
+    def _gen_try(self, node: ast.TryStatement) -> None:
+        self.emit("try:")
+        self.indent += 1
+        for s in node.try_body:
+            self.gen_statement(s)
+        self.indent -= 1
+        self.emit("except Exception as _err:")
+        self.indent += 1
+        if node.catch_var is not None:
+            self._check_identifier(node.catch_var, node)
+            self.emit(f"{node.catch_var} = _ml.catch_error(_err)")
+        if not node.catch_body:
+            self.emit("pass")
+        for s in node.catch_body:
+            self.gen_statement(s)
+        self.indent -= 1
+
     def _gen_return(self, node: ast.ReturnStatement) -> None:
         if self._function_outputs is not None:
             outs = ", ".join(self._function_outputs)
@@ -614,7 +652,7 @@ def generate(
     statements: list[ast.Statement],
     filename: str = "<malt>",
     optimization_level: int = 1,
-) -> tuple[str, list[tuple[int, object]]]:
+) -> tuple[str, list[tuple[int, object]], list[dict]]:
     gen = CodeGenerator(filename, optimization_level=optimization_level)
     source = gen.gen_program(statements)
-    return source, gen.source_map
+    return source, gen.source_map, gen.diagnostics

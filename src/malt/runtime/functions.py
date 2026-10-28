@@ -68,8 +68,21 @@ conj = _ufunc("conj")
 angle = _ufunc("angle")
 floor = _ufunc("floor")
 ceil = _ufunc("ceil")
-round = _ufunc("round")
 sign = _ufunc("sign")
+
+
+def _round_half_away(v: Any) -> Any:
+    """MATLAB ``round``: ties are rounded away from zero (not banker's)."""
+    return np.sign(v) * np.floor(np.abs(v) + 0.5)
+
+
+def round(x: Any) -> np.ndarray:  # noqa: A001 - shadows builtin on purpose
+    a = as_array(x)
+    if isinstance(a, str):
+        raise RuntimeError_("round is not defined for strings")
+    if np.iscomplexobj(a):
+        return _round_half_away(a.real) + 1j * _round_half_away(a.imag)
+    return _round_half_away(a)
 
 
 def atan2(y: Any, x: Any) -> np.ndarray:
@@ -188,67 +201,58 @@ def fliplr(A: Any) -> np.ndarray:
 
 def _reduce_dim(x: Any, dim: Any | None):
     a = as_array(x)
-    d = None
+    if isinstance(a, str):
+        raise RuntimeError_("reductions are not defined for strings")
     if dim is not None:
         d = int(scalar_value(dim)) - 1
+    else:
+        d = _first_non_singleton(a)
     return a, d
+
+
+def _first_non_singleton(a: np.ndarray) -> int:
+    """MATLAB reduces along the first dimension whose size exceeds 1."""
+    for i in range(a.ndim):
+        if a.shape[i] > 1:
+            return i
+    return 0
 
 
 def sum_(x: Any, dim: Any | None = None) -> np.ndarray:
     a, d = _reduce_dim(x, dim)
-    r = np.sum(a, axis=d) if d is not None else np.sum(a)
-    return _as_scalar_or_keepdim(r, a, d)
+    return np.sum(a, axis=d, keepdims=True)
 
 
 def prod(x: Any, dim: Any | None = None) -> np.ndarray:
     a, d = _reduce_dim(x, dim)
-    r = np.prod(a, axis=d) if d is not None else np.prod(a)
-    return _as_scalar_or_keepdim(r, a, d)
+    return np.prod(a, axis=d, keepdims=True)
 
 
 def mean(x: Any, dim: Any | None = None) -> np.ndarray:
     a, d = _reduce_dim(x, dim)
-    r = np.mean(a, axis=d) if d is not None else np.mean(a)
-    return _as_scalar_or_keepdim(r, a, d)
+    return np.mean(a, axis=d, keepdims=True)
 
 
 def min_(x: Any, dim: Any | None = None) -> np.ndarray:
     a, d = _reduce_dim(x, dim)
-    r = np.min(a, axis=d) if d is not None else np.min(a)
-    return _as_scalar_or_keepdim(r, a, d)
+    return np.min(a, axis=d, keepdims=True)
 
 
 def max_(x: Any, dim: Any | None = None) -> np.ndarray:
     a, d = _reduce_dim(x, dim)
-    r = np.max(a, axis=d) if d is not None else np.max(a)
-    return _as_scalar_or_keepdim(r, a, d)
+    return np.max(a, axis=d, keepdims=True)
 
 
 def cumsum(x: Any, dim: Any | None = None) -> np.ndarray:
     a, d = _reduce_dim(x, dim)
-    if d is None:
-        return np.cumsum(a).reshape(1, -1)
     return np.cumsum(a, axis=d)
 
 
 def cumprod(x: Any, dim: Any | None = None) -> np.ndarray:
     a, d = _reduce_dim(x, dim)
-    if d is None:
-        return np.cumprod(a).reshape(1, -1)
     return np.cumprod(a, axis=d)
 
 
 def sort(x: Any, dim: Any | None = None) -> np.ndarray:
     a, d = _reduce_dim(x, dim)
-    if d is None:
-        return np.sort(a, axis=None).reshape(1, -1)
     return np.sort(a, axis=d)
-
-
-def _as_scalar_or_keepdim(r: np.ndarray, a: np.ndarray, d: int | None) -> np.ndarray:
-    if d is None:
-        return np.array([[r]])
-    r = np.asarray(r)
-    if r.ndim == 0:
-        return r.reshape(1, 1)
-    return r

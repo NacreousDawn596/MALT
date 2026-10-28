@@ -13,7 +13,9 @@ from .parser import parse
 def _compile_cached(source: str, filename: str, optimization_level: int) -> CompilationUnit:
     statements = parse(source, filename)
     semantic.analyze(statements)
-    generated, source_map = codegen.generate(statements, filename, optimization_level)
+    generated, source_map, diagnostics = codegen.generate(
+        statements, filename, optimization_level
+    )
     code = compile(
         generated,
         filename=f"<malt-generated:{filename}>",
@@ -27,6 +29,7 @@ def _compile_cached(source: str, filename: str, optimization_level: int) -> Comp
         code=code,
         source_map=source_map,
         optimization_level=optimization_level,
+        diagnostics=diagnostics,
     )
 
 

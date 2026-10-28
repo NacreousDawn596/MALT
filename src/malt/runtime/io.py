@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sys
 from typing import Any
 
@@ -75,28 +76,41 @@ def display(x: Any) -> None:
     disp(x)
 
 
-def fprintf(fmt: Any, *args: Any) -> None:
-    fmt = str(fmt)
-    converted: list[Any] = []
-    for arg in args:
-        a = as_array(arg)
-        if isinstance(a, str):
-            converted.append(a)
-        elif a.size == 1:
-            v = a.reshape(-1)[0]
-            if isinstance(v, complex):
-                converted.append(complex(v))
+
+_SPEC_RE = re.compile(r"%(?:[-+ #0])?(?:\d+|\*)?(?:\.\d+|\.\*)?[diouxXeEfFgGcrs]")
+
+
+def _cycle_format(fmt: str, values: list[Any]) -> str:
+    """Apply a MATLAB-style format string, cycling it when there are more
+    values than conversion specifiers (as MATLAB ``fprintf`` does)."""
+    if not values:
+        return fmt
+    tokens: list[tuple[str, str]] = []
+    last = 0
+    for m in _SPEC_RE.finditer(fmt):
+        tokens.append(("lit", fmt[last : m.start()]))
+        tokens.append(("spec", m.group()))
+        last = m.end()
+    tokens.append(("lit", fmt[last:]))
+    n = sum(1 for k, _ in tokens if k == "spec")
+    if n == 0:
+        return fmt.replace("%%", "%")
+    out: list[str] = []
+    i = 0
+    while i < len(values):
+        for kind, text in tokens:
+            if kind == "lit":
+                out.append(text)
             else:
-                converted.append(v.item() if hasattr(v, "item") else v)
-        else:
-            for v in a.flatten(order="F"):
-                converted.append(v.item() if hasattr(v, "item") else v)
-    text = fmt % tuple(converted) if converted else fmt
-    print(text, end="", file=sys.stdout)
+                if i < len(values):
+                    out.append(text % values[i])
+                    i += 1
+                else:
+                    break
+    return "".join(out)
 
 
-def sprintf(fmt: Any, *args: Any) -> str:
-    fmt = str(fmt)
+def _flatten_args(args: tuple[Any, ...]) -> list[Any]:
     converted: list[Any] = []
     for arg in args:
         a = as_array(arg)
@@ -108,7 +122,25 @@ def sprintf(fmt: Any, *args: Any) -> str:
         else:
             for v in a.flatten(order="F"):
                 converted.append(v.item() if hasattr(v, "item") else v)
-    return fmt % tuple(converted) if converted else fmt
+    return converted
+
+
+def fprintf(fmt: Any, *args: Any) -> None:
+    fmt = str(fmt)
+    converted = _flatten_args(args)
+    if not converted:
+        text = fmt
+    else:
+        text = _cycle_format(fmt, converted)
+    print(text, end="", file=sys.stdout)
+
+
+def sprintf(fmt: Any, *args: Any) -> str:
+    fmt = str(fmt)
+    converted = _flatten_args(args)
+    if not converted:
+        return fmt
+    return _cycle_format(fmt, converted)
 
 
 def clc() -> None:

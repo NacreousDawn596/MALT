@@ -192,6 +192,14 @@ class Lexer:
                 self._advance()
                 continue
 
+            if ch == ".":
+                # Field access, e.g. ``err.message`` (a bare dot not followed
+                # by an operator character or a digit).
+                loc = self._loc()
+                self._emit(TokenType.DOT, ".", ".", loc)
+                self._advance()
+                continue
+
             if ch in _DELIMITERS:
                 loc = self._loc()
                 self._emit(_DELIMITERS[ch], ch, ch, loc)

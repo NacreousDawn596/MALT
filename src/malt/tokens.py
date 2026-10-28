@@ -27,6 +27,7 @@ class TokenType(enum.Enum):
     DOT_CARET = ".^"
     TRANSPOSE = "'"
     DOT_TRANSPOSE = ".'"
+    DOT = "."
     EQ_EQ = "=="
     NE = "~="
     LT = "<"

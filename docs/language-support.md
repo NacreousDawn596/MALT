@@ -59,8 +59,8 @@ Legend: ✅ implemented and tested · ⚠️ implemented with limitations · ➖
 ## Control flow
 
 `if`/`elseif`/`else`/`end`, `for`, `while`, `break`, `continue`, `return`,
-`switch`/`case`/`otherwise` — ✅.
-`try`/`catch`, `parfor` — ❌.
+`switch`/`case`/`otherwise`, `try`/`catch` — ✅.
+`parfor` — ❌.
 
 ## Functions
 
@@ -116,7 +116,9 @@ covered by compatibility test 14.
 
 ## Known limitations
 
-- `try`/`catch`, cell arrays, and structs are unsupported.
+- Cell arrays and structs are unsupported (specifications written; see
+  `docs/specs/`). Field access `.` is supported only on `try/catch` error
+  values (`err.message`, `err.identifier`).
 - The execution namespace is not a security sandbox; see the architecture doc.
 - Matrix literals with spaced binary `+` between elements are interpreted as
   unary signs (`[1 +2]` works; `[1 + 2]` is not `[3]`).

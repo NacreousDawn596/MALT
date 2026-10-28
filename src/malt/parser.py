@@ -127,6 +127,8 @@ class Parser:
                 return self.parse_while()
             if name == "switch":
                 return self.parse_switch()
+            if name == "try":
+                return self.parse_try()
             if name == "break":
                 return self.parse_break()
             if name == "continue":
@@ -300,6 +302,28 @@ class Parser:
         self.expect_block_end("switch", start)
         return ast.SwitchStatement(value, cases, otherwise, start.location)
 
+    def parse_try(self) -> ast.TryStatement:
+        start = self.advance()  # 'try'
+        self.skip_newlines()
+        try_body = self.parse_block("try")
+
+        catch_var: str | None = None
+        self.skip_newlines()
+        tok = self.peek()
+        if tok.type == TokenType.IDENT and tok.value == "catch":
+            self.advance()
+            # A catch variable is an identifier on the SAME line as `catch`;
+            # a newline before the identifier means it starts the catch body.
+            if self.peek().type == TokenType.IDENT:
+                catch_var = str(self.advance().value)
+            self.skip_newlines()
+            catch_body = self.parse_block("catch")
+        else:
+            catch_body = []
+
+        self.expect_block_end("try", start)
+        return ast.TryStatement(try_body, catch_var, catch_body, start.location)
+
     def parse_break(self) -> ast.BreakStatement:
         tok = self.advance()
         return ast.BreakStatement(tok.location)
@@ -334,7 +358,7 @@ class Parser:
                 self.error(f"missing 'end' for {owner!r} block", tok)
             if tok.type == TokenType.IDENT and tok.value == "end":
                 break
-            if tok.type == TokenType.IDENT and tok.value in ("elseif", "else", "case", "otherwise"):
+            if tok.type == TokenType.IDENT and tok.value in ("elseif", "else", "case", "otherwise", "catch"):
                 break
             stmt = self.parse_statement()
             statements.append(stmt)
@@ -468,9 +492,17 @@ class Parser:
 
     def parse_postfix(self) -> ast.Node:
         node = self.parse_primary()
-        while self.peek().type in (TokenType.TRANSPOSE, TokenType.DOT_TRANSPOSE):
-            op = self.advance()
-            node = ast.UnaryOperation(op.raw, node, op.location)
+        while True:
+            if self.peek().type in (TokenType.TRANSPOSE, TokenType.DOT_TRANSPOSE):
+                op = self.advance()
+                node = ast.UnaryOperation(op.raw, node, op.location)
+                continue
+            if self.peek().type == TokenType.DOT:
+                dot = self.advance()
+                field = self.expect(TokenType.IDENT, "expected field name after '.'")
+                node = ast.FieldAccess(node, str(field.value), dot.location)
+                continue
+            break
         return node
 
     def parse_primary(self) -> ast.Node:

@@ -40,6 +40,7 @@ _RESTRICTED_BUILTINS: dict[str, Any] = {
         "ZeroDivisionError",
         "ValueError",
         "TypeError",
+        "Exception",
     )
 }
 

@@ -58,6 +58,8 @@
           packages = [
             pythonEnv
             pkgs.git
+            # GNU Octave, for optional differential tests (tests/differential/).
+            pkgs.octave
           ];
           shellHook = ''
             export PYTHONPATH="$PWD/src:$PYTHONPATH"

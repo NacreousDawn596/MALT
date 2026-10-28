@@ -109,6 +109,13 @@ class AnonymousFunction(Node):
 
 
 @dataclass
+class FieldAccess(Node):
+    base: Node
+    field: str
+    location: SourceLocation
+
+
+@dataclass
 class FunctionHandle(Node):
     """A function handle: either a named function or an anonymous function."""
 
@@ -170,6 +177,14 @@ class SwitchStatement(Statement):
 
 
 @dataclass
+class TryStatement(Statement):
+    try_body: list[Statement]
+    catch_var: str | None
+    catch_body: list[Statement]
+    location: SourceLocation
+
+
+@dataclass
 class BreakStatement(Statement):
     location: SourceLocation
 
@@ -215,6 +230,7 @@ __all__ = [
     "IndexExpression",
     "AnonymousFunction",
     "FunctionHandle",
+    "FieldAccess",
     "Statement",
     "Assignment",
     "ExpressionStatement",
@@ -222,6 +238,7 @@ __all__ = [
     "ForStatement",
     "WhileStatement",
     "SwitchStatement",
+    "TryStatement",
     "BreakStatement",
     "ContinueStatement",
     "ReturnStatement",

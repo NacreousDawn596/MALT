@@ -51,3 +51,19 @@ inputs and asserts it never hangs and never raises a non-`MaltError` exception.
 Automated tests always use the headless `Agg` backend. Interactive desktop
 window tests are a separate, optional concern (see `docs/nixos.md`); they are
 not part of the default suite and require `MPLBACKEND=Qt5Agg` and a display.
+
+## Differential testing against GNU Octave
+
+`tests/differential/test_octave.py` runs the same `.m` source through MALT and
+GNU Octave (when installed, via `octave-cli`) and compares language semantics —
+values and their order, emitted with `fprintf('%g ', …)` for canonical output.
+These tests are skipped automatically if Octave is not on the path.
+
+```bash
+nix develop -c pytest tests/differential/test_octave.py
+```
+
+They compare semantics, not display formatting (Octave's `disp` wraps wide
+matrices and formats complex numbers differently, which are allowed to
+differ). They have caught real bugs: reduction direction, `round` tie-breaking,
+and eigenvalue ordering.

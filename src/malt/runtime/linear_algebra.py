@@ -48,9 +48,26 @@ def cond(A: Any, p: Any | None = None) -> np.ndarray:
     return np.array([[np.linalg.cond(a, pval)]])
 
 
+def _sort_eig(w: np.ndarray, v: np.ndarray | None):
+    # MATLAB returns eigenvalues sorted ascending (by real part, then
+    # imaginary part); NumPy does not guarantee an order.
+    order = np.lexsort((np.imag(w), np.real(w)))
+    w = w[order]
+    if v is not None:
+        v = v[:, order]
+    return w, v
+
+
 def eig(A: Any, nout: int = 1) -> Any:
     a = as_array(A)
     w, v = np.linalg.eig(a)
+    # MATLAB returns real eigenvalues/vectors when the imaginary parts are
+    # numerically zero (e.g. for real symmetric matrices).
+    if np.allclose(w.imag, 0, atol=1e-12):
+        w = w.real
+    if nout >= 2 and np.allclose(v.imag, 0, atol=1e-12):
+        v = v.real
+    w, v = _sort_eig(w, v)
     if nout >= 2:
         return v, np.diag(w)
     return w.reshape(-1, 1)
@@ -67,7 +84,11 @@ def svd(A: Any, nout: int = 1) -> Any:
 
 
 def eigvals(A: Any) -> np.ndarray:
-    return np.linalg.eigvals(as_array(A)).reshape(-1, 1)
+    w = np.linalg.eigvals(as_array(A))
+    if np.allclose(w.imag, 0, atol=1e-12):
+        w = w.real
+    w, _ = _sort_eig(w, None)
+    return w.reshape(-1, 1)
 
 
 def lu(A: Any, nout: int = 1) -> Any:

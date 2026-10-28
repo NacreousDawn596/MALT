@@ -84,5 +84,5 @@ def test_break_outside_loop():
 def test_generate_valid_python():
     from malt.codegen import generate
 
-    src, _ = generate(parse("A = [1 2; 3 4];\nC = A * A;\n"))
+    src, _, _ = generate(parse("A = [1 2; 3 4];\nC = A * A;\n"))
     compile(src, "<gen>", "exec")

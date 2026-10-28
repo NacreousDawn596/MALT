@@ -34,6 +34,8 @@ def cmd_eval(args: argparse.Namespace) -> int:
 def cmd_run(args: argparse.Namespace) -> int:
     try:
         unit = _compile_file(args.file, args.optimization_level)
+        if args.explain:
+            print(unit.coverage_report())
         if args.show_generated:
             print(unit.show_generated())
             return 0
@@ -49,6 +51,8 @@ def cmd_run(args: argparse.Namespace) -> int:
 def cmd_compile(args: argparse.Namespace) -> int:
     try:
         unit = _compile_file(args.file, args.optimization_level)
+        if args.explain:
+            print(unit.coverage_report(), file=sys.stderr)
         output = unit.show_generated()
         if args.output:
             with open(args.output, "w", encoding="utf-8") as f:
@@ -87,6 +91,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_run = sub.add_parser("run", help="run a MATLAB script")
     p_run.add_argument("file")
     p_run.add_argument("--show-generated", action="store_true")
+    p_run.add_argument("--explain", action="store_true")
     p_run.add_argument("--debug", action="store_true")
     p_run.add_argument("--optimization-level", type=int, choices=(0, 1, 2), default=1)
     p_run.set_defaults(func=cmd_run)
@@ -94,6 +99,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_compile = sub.add_parser("compile", help="emit generated Python")
     p_compile.add_argument("file")
     p_compile.add_argument("-o", "--output", default=None)
+    p_compile.add_argument("--explain", action="store_true")
     p_compile.add_argument("--debug", action="store_true")
     p_compile.add_argument("--optimization-level", type=int, choices=(0, 1, 2), default=1)
     p_compile.set_defaults(func=cmd_compile)
