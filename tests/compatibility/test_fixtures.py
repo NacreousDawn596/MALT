@@ -7,7 +7,6 @@ import os
 
 import numpy as np
 import pytest
-
 from conftest import arr, norm_out, run_file, scalar
 
 FIXTURES = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fixtures")

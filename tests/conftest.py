@@ -11,9 +11,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
 
 import malt.runtime.graphics as mg  # noqa: E402
-
 from malt.compiler import compile_source  # noqa: E402
-from malt.errors import MaltError  # noqa: E402
 from malt.executor import execute  # noqa: E402
 
 
@@ -37,7 +35,7 @@ def run_source(source: str, filename: str = "<test>"):
 
 
 def run_file(path: str):
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         source = f.read()
     return run_source(source, filename=path)
 

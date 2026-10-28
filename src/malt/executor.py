@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import builtins as _py_builtins
+import sys
+import traceback
 from typing import Any
 
 from . import runtime as _ml
-from .errors import MaltError, ReturnSignal
+from .errors import MaltError, ReturnSignal, RuntimeError_, SourceLocation, UndefinedVariableError
 
 # A conservative whitelist of Python builtins available to generated code.
 # The generated code only references ``_ml`` and plain Python expressions, so
@@ -52,6 +54,29 @@ def make_namespace() -> dict[str, Any]:
     return ns
 
 
+def _locate(unit: Any) -> SourceLocation | None:
+    """Map the current traceback's generated-code line back to MATLAB source."""
+    tb = sys.exc_info()[2]
+    for frame in traceback.extract_tb(tb):
+        if frame.filename.startswith("<malt-generated"):
+            lineno = frame.lineno
+            best: SourceLocation | None = None
+            for gen_line, loc in unit.source_map:
+                if gen_line <= lineno:
+                    best = loc
+                else:
+                    break
+            return best
+    return None
+
+
+def _extract_name(err: NameError) -> str:
+    msg = str(err)
+    if "'" in msg:
+        return msg.split("'")[1]
+    return msg
+
+
 def execute(unit: Any, namespace: dict[str, Any] | None = None) -> dict[str, Any]:
     """Execute a compiled unit in-memory, returning the workspace namespace."""
     if namespace is None:
@@ -61,8 +86,16 @@ def execute(unit: Any, namespace: dict[str, Any] | None = None) -> dict[str, Any
         exec(unit.code, namespace)
     except ReturnSignal:
         pass
-    except MaltError:
+    except MaltError as e:
+        if e.location is None:
+            e.location = _locate(unit)
         raise
+    except NameError as e:
+        raise UndefinedVariableError(
+            f"undefined variable or function '{_extract_name(e)}'", _locate(unit)
+        ) from e
+    except Exception as e:
+        raise RuntimeError_(str(e), _locate(unit)) from e
     finally:
         _ml.set_current_namespace(None)
     return namespace

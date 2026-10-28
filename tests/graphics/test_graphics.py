@@ -5,11 +5,9 @@ from __future__ import annotations
 import os
 
 import numpy as np
-import pytest
+from conftest import run_file
 
 import malt.runtime.graphics as mg
-
-from conftest import run_file
 
 EXAMPLES = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "examples")
 

@@ -83,6 +83,20 @@ _BUILTINS = frozenset(
 # Builtins with output-count-aware semantics.
 _MULTIOUT = frozenset({"eig", "svd", "ode45", "lu", "qr"})
 
+# Builtins that produce no meaningful value to display when called without a
+# trailing semicolon (commands, plotting, and graphics state setters).
+_VOID_BUILTINS = frozenset(
+    {
+        "disp", "fprintf", "clc", "clear", "clf", "hold", "grid", "rng",
+        "who", "whos", "help", "close", "view", "drawnow", "show", "axis",
+        "xlim", "ylim", "zlim", "title", "xlabel", "ylabel", "zlabel",
+        "legend", "colorbar", "subplot", "figure", "saveas", "exportgraphics",
+        "plot", "scatter", "bar", "histogram", "stem", "stairs", "semilogy",
+        "semilogx", "loglog", "errorbar", "fill", "imagesc", "image",
+        "contour", "contourf", "mesh", "surf",
+    }
+)
+
 _RESERVED = frozenset({"_ml", "_ans", "_malt_ns"})
 
 # Bare identifiers that MATLAB treats as zero-argument function calls
@@ -100,6 +114,7 @@ class CodeGenerator:
         self._end_base: str | None = None
         self._end_dim: int = 0
         self._function_outputs: list[str] | None = None
+        self.source_map: list[tuple[int, object]] = []  # (generated line, location)
 
     # -- low-level emission -------------------------------------------------
     def emit(self, line: str = "") -> None:
@@ -269,6 +284,9 @@ class CodeGenerator:
         self.emit()
 
     def gen_statement(self, node: ast.Statement) -> None:
+        # Record a source mapping from the next generated line to the MATLAB
+        # source location, for source-aware runtime diagnostics.
+        self.source_map.append((len(self.lines) + 1, node.location))
         if isinstance(node, ast.Assignment):
             self._gen_assignment(node)
         elif isinstance(node, ast.ExpressionStatement):
@@ -365,22 +383,32 @@ class CodeGenerator:
         return self.gen_expr(value)
 
     def _gen_expr_statement(self, node: ast.ExpressionStatement) -> None:
-        if isinstance(node.expr, ast.FunctionCall):
-            name = node.expr.name
-            # zero-output command calls such as `clc`, `rng(42)`, `grid on`
-            self.emit(self._gen_call(node.expr, 0))
+        expr = node.expr
+        if isinstance(expr, ast.FunctionCall):
+            name = expr.name
+            if name in _VOID_BUILTINS:
+                self.emit(self._gen_call(expr, 0))
+                return
+            rhs = self._gen_call(expr, 1)
+            if node.suppress:
+                self.emit(rhs)
+            else:
+                self.emit(f"_ans = _ml.as_array({rhs})")
+                self.emit("_ml.display(_ans)")
             return
-        if isinstance(node.expr, ast.Identifier):
-            name = node.expr.name
+        if isinstance(expr, ast.Identifier):
+            name = expr.name
             if name in _BUILTINS or name in _MULTIOUT:
                 # bare command with no arguments: `clc`, `clf`, `colorbar`
                 self.emit(f"_ml.{name}()")
                 return
-            self.emit(f"_ml.display({name})")
+            if not node.suppress:
+                self.emit(f"_ml.display({name})")
             return
-        rhs = self.gen_expr(node.expr)
-        self.emit(f"_ans = _ml.as_array({rhs})")
-        self.emit("_ml.display(_ans)")
+        rhs = self.gen_expr(expr)
+        if not node.suppress:
+            self.emit(f"_ans = _ml.as_array({rhs})")
+            self.emit("_ml.display(_ans)")
 
     def _gen_if(self, node: ast.IfStatement) -> None:
         for i, (cond, body) in enumerate(node.branches):
@@ -421,6 +449,7 @@ class CodeGenerator:
             self.emit("raise _ml.ReturnSignal()")
 
 
-def generate(statements: list[ast.Statement], filename: str = "<malt>") -> str:
+def generate(statements: list[ast.Statement], filename: str = "<malt>") -> tuple[str, list[tuple[int, object]]]:
     gen = CodeGenerator(filename)
-    return gen.gen_program(statements)
+    source = gen.gen_program(statements)
+    return source, gen.source_map

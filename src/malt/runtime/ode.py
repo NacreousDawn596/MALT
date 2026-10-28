@@ -8,7 +8,7 @@ import numpy as np
 from scipy.integrate import solve_ivp
 
 from ..errors import RuntimeError_
-from .arrays import as_array, scalar_value
+from .arrays import as_array
 
 
 def ode45(odefun: Any, tspan: Any, y0: Any, nout: int = 2, options: Any = None) -> Any:

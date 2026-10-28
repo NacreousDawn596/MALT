@@ -150,7 +150,12 @@ class Lexer:
                 continue
 
             if ch == "'":
-                if self._prev_significant in _OPERAND_PRECEDERS:
+                # Transpose when it directly follows a value with no whitespace;
+                # otherwise it begins a string literal.
+                if (
+                    not self._pending_space
+                    and self._prev_significant in _OPERAND_PRECEDERS
+                ):
                     self._emit(TokenType.TRANSPOSE, "'", "'", self._loc())
                     self._advance()
                     continue
@@ -215,58 +220,47 @@ class Lexer:
         loc = self._loc()
         is_float = False
 
-        # integer or leading-dot fraction
+        # integer part (or leading-dot fraction)
         if self._peek() in _DIGITS:
             while self.pos < len(self.source) and self._peek() in _DIGITS:
                 self._advance()
-            if self._peek() == "." and self._peek(1) != "'":
-                # `.` followed by `.` would be `..` — treat single dot as fraction
-                if self._peek(1) in _DIGITS or self._peek(1) not in ".\\^*/":
-                    is_float = True
-                    self._advance()  # consume '.'
-                    while self.pos < len(self.source) and self._peek() in _DIGITS:
-                        self._advance()
         elif self._peek() == ".":
             is_float = True
             self._advance()
             while self.pos < len(self.source) and self._peek() in _DIGITS:
                 self._advance()
 
+        # fractional part (a `.` that is not a `.`, `.*`, `./`, `.\\`, `.^` or `.'`)
+        if self._peek() == "." and self._peek(1) not in (".", "\\", "^", "*", "/", "'"):
+            is_float = True
+            self._advance()
+            while self.pos < len(self.source) and self._peek() in _DIGITS:
+                self._advance()
+
         # exponent
-        if self._peek() in "eE":
+        if self._peek() in ("e", "E"):
             nxt = self._peek(1)
-            if nxt in _DIGITS or (nxt in "+-" and self._peek(2) in _DIGITS):
+            if nxt in _DIGITS or (nxt in ("+", "-") and self._peek(2) in _DIGITS):
                 is_float = True
                 self._advance()
-                if self._peek() in "+-":
+                if self._peek() in ("+", "-"):
                     self._advance()
                 while self.pos < len(self.source) and self._peek() in _DIGITS:
                     self._advance()
 
-        # imaginary suffix
-        imag = False
-        if self._peek() in "ij":
-            nxt = self._peek(1)
-            if nxt not in _IDENT_CONT:
-                imag = True
-                self._advance()
-
-        raw = self.source[start : self.pos]
-        if imag:
-            # value becomes a pure imaginary complex
-            if is_float or ("." in raw or "e" in raw.lower()):
-                value = complex(0.0, float(raw[:-1]))
-            else:
-                value = complex(0.0, float(raw[:-1]))
+        # imaginary suffix (e.g. 4i, 3.5j, 2e3i)
+        if self._peek() in ("i", "j") and self._peek(1) not in _IDENT_CONT:
+            self._advance()
+            raw = self.source[start : self.pos]
+            value = complex(0.0, float(raw[:-1]))
             self._emit(TokenType.FLOAT, value, raw, loc)
             return
 
+        raw = self.source[start : self.pos]
         if is_float:
-            value = float(raw)
-            self._emit(TokenType.FLOAT, value, raw, loc)
+            self._emit(TokenType.FLOAT, float(raw), raw, loc)
         else:
-            value = int(raw)
-            self._emit(TokenType.INTEGER, value, raw, loc)
+            self._emit(TokenType.INTEGER, int(raw), raw, loc)
 
     def _read_string(self) -> None:
         loc = self._loc()

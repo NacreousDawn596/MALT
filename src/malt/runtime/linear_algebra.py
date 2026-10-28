@@ -31,13 +31,14 @@ def norm(A: Any, p: Any | None = None) -> np.ndarray:
     a = as_array(A)
     if p is None:
         return np.array([[np.linalg.norm(a)]])
-    order = None if p is None else int(scalar_value(p))
-    if order == 1:
+    pval = int(scalar_value(p))
+    order: Any
+    if pval == 1:
         order = 1
-    elif order == 2:
+    elif pval == 2:
         order = 2
-    elif order == float("inf") or order is None:
-        order = np.inf
+    else:
+        order = np.inf if pval in (float("inf"), -1) else pval
     return np.array([[np.linalg.norm(a, ord=order)]])
 
 
@@ -72,12 +73,12 @@ def eigvals(A: Any) -> np.ndarray:
 def lu(A: Any, nout: int = 1) -> Any:
     from scipy.linalg import lu as _lu
 
-    p, l, u = _lu(as_array(A))
+    p, lower, upper = _lu(as_array(A))
     if nout >= 3:
-        return p, l, u
+        return p, lower, upper
     if nout == 2:
-        return l, u
-    return np.concatenate([l, u], axis=1)
+        return lower, upper
+    return np.concatenate([lower, upper], axis=1)
 
 
 def chol(A: Any) -> np.ndarray:

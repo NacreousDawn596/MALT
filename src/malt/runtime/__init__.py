@@ -61,9 +61,9 @@ from .arrays import (  # noqa: E402
     as_array,
     colon,
     for_columns,
+    is_logical,
     is_scalar,
     is_string,
-    is_logical,
     is_true,
     isequal,
     length,
@@ -77,33 +77,7 @@ from .arrays import (  # noqa: E402
     scalar_value,
     size,
 )
-from .indexing import COLON, assign, call, end_, index  # noqa: E402
-from .operators import (  # noqa: E402
-    and_,
-    ctranspose,
-    eq,
-    ge,
-    gt,
-    ldivide,
-    le,
-    logical_not,
-    lt,
-    mldivide,
-    mpower,
-    mrdivide,
-    mtimes,
-    ne,
-    or_,
-    plus,
-    power,
-    rdivide,
-    short_and,
-    short_or,
-    times,
-    transpose,
-    uneg,
-    uplus,
-)
+from .calculus import fzero, integral, roots  # noqa: E402
 from .functions import (  # noqa: E402
     abs,
     acos,
@@ -121,16 +95,14 @@ from .functions import (  # noqa: E402
     exp,
     eye,
     fix,
-    flipud,
     fliplr,
+    flipud,
     floor,
     imag,
     log,
-    log10,
     log2,
-    max_ as max,
+    log10,
     mean,
-    min_ as min,
     mod,
     ones,
     prod,
@@ -147,44 +119,24 @@ from .functions import (  # noqa: E402
     sinh,
     sort,
     sqrt,
-    sum_ as sum,
     tan,
     tanh,
     zeros,
 )
-from .linear_algebra import (  # noqa: E402
-    chol,
-    cond,
-    det,
-    eig,
-    eigvals,
-    inv,
-    lu,
-    norm,
-    pinv,
-    polyfit,
-    qr,
-    rank,
-    svd,
-    trace,
+from .functions import (
+    max_ as max,
 )
-from .calculus import fzero, integral, roots  # noqa: E402
-from .ode import ode45  # noqa: E402
-from .io import (  # noqa: E402
-    clc,
-    disp,
-    display,
-    exportgraphics,
-    format_array,
-    fprintf,
-    saveas,
-    sprintf,
+from .functions import (
+    min_ as min,
+)
+from .functions import (
+    sum_ as sum,
 )
 from .graphics import (  # noqa: E402
     axis,
     bar,
-    close,
     clf,
+    close,
     colorbar,
     contour,
     contourf,
@@ -223,7 +175,61 @@ from .graphics import (  # noqa: E402
     zlabel,
     zlim,
 )
-
+from .indexing import COLON, assign, call, end_, index  # noqa: E402
+from .io import (  # noqa: E402
+    clc,
+    disp,
+    display,
+    exportgraphics,
+    format_array,
+    fprintf,
+    saveas,
+    sprintf,
+)
+from .linear_algebra import (  # noqa: E402
+    chol,
+    cond,
+    det,
+    eig,
+    eigvals,
+    inv,
+    lu,
+    norm,
+    pinv,
+    polyfit,
+    qr,
+    rank,
+    svd,
+    trace,
+)
+from .ode import ode45  # noqa: E402
+from .operators import (  # noqa: E402
+    and_,
+    ctranspose,
+    eq,
+    ge,
+    gt,
+    ldivide,
+    le,
+    logical_not,
+    lt,
+    minus,
+    mldivide,
+    mpower,
+    mrdivide,
+    mtimes,
+    ne,
+    or_,
+    plus,
+    power,
+    rdivide,
+    short_and,
+    short_or,
+    times,
+    transpose,
+    uneg,
+    uplus,
+)
 
 # ---------------------------------------------------------------------------
 # Workspace commands

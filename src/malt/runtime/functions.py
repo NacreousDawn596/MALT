@@ -9,7 +9,7 @@ import numpy as np
 from ..errors import RuntimeError_
 from .arrays import as_array, scalar_value
 
-_ELEMENTWISE_UFUNCS = {
+_ELEMENTWISE_UFUNCS: dict[str, Any] = {
     "sin": np.sin,
     "cos": np.cos,
     "tan": np.tan,
@@ -47,8 +47,29 @@ def _ufunc(name: str):
     return call
 
 
-for _name in _ELEMENTWISE_UFUNCS:
-    globals()[_name] = _ufunc(_name)
+sin = _ufunc("sin")
+cos = _ufunc("cos")
+tan = _ufunc("tan")
+asin = _ufunc("asin")
+acos = _ufunc("acos")
+atan = _ufunc("atan")
+sinh = _ufunc("sinh")
+cosh = _ufunc("cosh")
+tanh = _ufunc("tanh")
+exp = _ufunc("exp")
+log = _ufunc("log")
+log10 = _ufunc("log10")
+log2 = _ufunc("log2")
+sqrt = _ufunc("sqrt")
+abs = _ufunc("abs")
+real = _ufunc("real")
+imag = _ufunc("imag")
+conj = _ufunc("conj")
+angle = _ufunc("angle")
+floor = _ufunc("floor")
+ceil = _ufunc("ceil")
+round = _ufunc("round")
+sign = _ufunc("sign")
 
 
 def atan2(y: Any, x: Any) -> np.ndarray:

@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 
 from ..errors import IndexError_, RuntimeError_
-from .arrays import as_array, is_logical, is_scalar
+from .arrays import as_array
 
 # Sentinel for the ``:`` colon argument.
 COLON = slice(None)
@@ -45,7 +45,7 @@ def end_(A: Any, dim: int) -> np.ndarray:
     return np.array([[float(n)]])
 
 
-def index(A: Any, *subs: Any) -> np.ndarray:
+def index(A: Any, *subs: Any) -> Any:
     a = as_array(A)
     if isinstance(a, str):
         if len(subs) == 1:

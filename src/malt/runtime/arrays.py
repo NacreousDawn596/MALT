@@ -7,7 +7,7 @@ from typing import Any
 
 import numpy as np
 
-from ..errors import DimensionError, MaltError, RuntimeError_
+from ..errors import RuntimeError_
 
 
 def as_array(x: Any) -> Any:
@@ -111,7 +111,7 @@ def length(x: Any) -> np.ndarray:
     return np.array([[float(max(a.shape))]])
 
 
-def scalar_value(x: Any) -> float | complex:
+def scalar_value(x: Any) -> Any:
     a = as_array(x)
     if isinstance(a, str):
         raise RuntimeError_("expected a numeric scalar")
@@ -121,7 +121,7 @@ def scalar_value(x: Any) -> float | complex:
     return v.item() if hasattr(v, "item") else v
 
 
-def _scalar(x: Any) -> float | complex:
+def _scalar(x: Any) -> Any:
     return scalar_value(x)
 
 

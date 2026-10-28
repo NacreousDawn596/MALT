@@ -9,11 +9,11 @@ from . import __version__
 from .compiler import compile_source
 from .diagnostics import render_error
 from .errors import MaltError
-from .executor import execute, make_namespace
+from .executor import execute
 
 
 def _compile_file(path: str):
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         source = f.read()
     return compile_source(source, filename=path)
 

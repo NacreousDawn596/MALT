@@ -46,7 +46,14 @@ target-version = "py311"
 select = ["E", "F", "W", "I", "UP", "B"]
 ignore = ["E501"]
 
+[tool.ruff.lint.per-file-ignores]
+# runtime/__init__.py re-exports a flat namespace; those imports are the
+# public API and the module-level import order is intentional.
+"src/malt/runtime/__init__.py" = ["F401", "E402"]
+"src/malt/runtime/graphics.py" = ["E402"]
+"src/malt/runtime/functions.py" = ["E402"]
+
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.13"
 ignore_missing_imports = true
 check_untyped_defs = false

@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import os
 import sys
 from typing import Any
 
 import numpy as np
 
 from .arrays import as_array
-
 
 
 def _fmt_scalar(v: Any) -> str:
@@ -79,7 +77,7 @@ def display(x: Any) -> None:
 
 def fprintf(fmt: Any, *args: Any) -> None:
     fmt = str(fmt)
-    converted = []
+    converted: list[Any] = []
     for arg in args:
         a = as_array(arg)
         if isinstance(a, str):
@@ -99,7 +97,7 @@ def fprintf(fmt: Any, *args: Any) -> None:
 
 def sprintf(fmt: Any, *args: Any) -> str:
     fmt = str(fmt)
-    converted = []
+    converted: list[Any] = []
     for arg in args:
         a = as_array(arg)
         if isinstance(a, str):
