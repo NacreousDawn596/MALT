@@ -1,0 +1,14 @@
+{
+  "reportMissingImports": false,
+  "reportGeneralTypeIssues": false,
+  "reportUnknownMemberType": false,
+  "reportUnknownArgumentType": false,
+  "reportUnknownVariableType": false,
+  "reportUnknownParameterType": false,
+  "reportOptionalMemberAccess": false,
+  "reportArgumentType": false,
+  "reportAttributeAccessIssue": false,
+  "reportCallIssue": false,
+  "reportReturnType": false,
+  "pythonVersion": "3.11"
+}
