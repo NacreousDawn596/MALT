@@ -1,0 +1,26 @@
+# Common macOS/Linux ignore rules
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+htmlcov/
+
+# Nix build artifacts
+result
+result-*
+
+# Test artifacts (must never leak into the repo root)
+test_plot.png
+*.png
+
+# Editor
+.idea/
+.vscode/
+*.swp
