@@ -27,7 +27,7 @@ Legend: ✅ implemented and tested · ⚠️ implemented with limitations · ➖
 | `' .'` | conjugate / non-conjugating transpose | ✅ |
 | `== ~= < <= > >=` | comparisons | ✅ |
 | `& \|` | element-wise logical | ✅ |
-| `&& \|\|` | short-circuit logical (scalar) | ⚠️ both operands evaluated |
+| `&& \|\|` | short-circuit logical (scalar) | ✅ |
 | `~` | logical not | ✅ |
 | `:` | colon / range | ✅ |
 | `=` | assignment | ✅ |
@@ -58,8 +58,9 @@ Legend: ✅ implemented and tested · ⚠️ implemented with limitations · ➖
 
 ## Control flow
 
-`if`/`elseif`/`else`/`end`, `for`, `while`, `break`, `continue`, `return` — ✅.
-`switch`/`case`/`otherwise`, `try`/`catch`, `parfor` — ❌.
+`if`/`elseif`/`else`/`end`, `for`, `while`, `break`, `continue`, `return`,
+`switch`/`case`/`otherwise` — ✅.
+`try`/`catch`, `parfor` — ❌.
 
 ## Functions
 
@@ -115,8 +116,10 @@ covered by compatibility test 14.
 
 ## Known limitations
 
-- `&&`/`||` do not short-circuit (both operands are evaluated).
-- `switch`/`case`, `try`/`catch`, cell arrays, and structs are unsupported.
+- `try`/`catch`, cell arrays, and structs are unsupported.
 - The execution namespace is not a security sandbox; see the architecture doc.
 - Matrix literals with spaced binary `+` between elements are interpreted as
   unary signs (`[1 +2]` works; `[1 + 2]` is not `[3]`).
+- Scalar loop bodies and per-element indexed assignment remain far slower than
+  NumPy-vectorized equivalents (a MATLAB-style loop is not a vectorized
+  expression); see `benchmarks/` for measured numbers.

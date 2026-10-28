@@ -10,22 +10,43 @@ import numpy as np
 from ..errors import RuntimeError_
 
 
+class _Config:
+    __slots__ = ("optimized",)
+
+    def __init__(self) -> None:
+        self.optimized = True
+
+
+# Mutable holder so the optimization flag is read live by other runtime modules
+# (importing a plain bool would snapshot its value).
+_config = _Config()
+
+
+def set_optimization_level(level: int) -> None:
+    _config.optimized = level >= 1
+
+
 def as_array(x: Any) -> Any:
     """Normalize a value into MATLAB-visible form.
 
     Numeric scalars and arrays are promoted to at least 2-D numpy arrays with
     MATLAB shape conventions (scalars are 1x1, vectors keep their orientation).
     Strings and function handles pass through untouched.
+
+    The common case (an existing 2-D ndarray) is checked first so that scalar
+    arithmetic in tight loops does not pay for the string/callable/type checks.
     """
-    if isinstance(x, str):
-        return x
-    if callable(x) and not isinstance(x, np.ndarray):
-        return x
     if isinstance(x, np.ndarray):
+        if x.ndim == 2:
+            return x
         if x.ndim == 0:
             return x.reshape(1, 1)
         if x.ndim == 1:
             return x.reshape(1, -1)
+        return x
+    if isinstance(x, str):
+        return x
+    if callable(x):
         return x
     if isinstance(x, (list, tuple)):
         arr = np.asarray(x)
@@ -47,6 +68,28 @@ def as_array(x: Any) -> Any:
 
 def is_string(x: Any) -> bool:
     return isinstance(x, str)
+
+
+def is_scalar_like(x: Any) -> bool:
+    """True for native Python numbers and 0-d/1x1 NumPy arrays."""
+    if isinstance(x, np.ndarray):
+        return x.size == 1
+    if isinstance(x, str):
+        return False
+    return isinstance(x, (int, float, complex, bool, np.number))
+
+
+def py_scalar(x: Any) -> Any:
+    """Extract a native Python scalar from a scalar-like value (no copy)."""
+    if isinstance(x, np.ndarray):
+        if x.ndim == 2 and x.shape == (1, 1):
+            return x[0, 0]
+        if x.ndim == 0:
+            return x.item()
+        return x.reshape(-1)[0].item()
+    if isinstance(x, np.generic):
+        return x.item()
+    return x
 
 
 def is_scalar(x: Any) -> bool:
@@ -231,16 +274,35 @@ def isequal(a: Any, b: Any, *rest: Any) -> np.ndarray:
 
 
 def for_columns(x: Any):
-    """Yield the columns of an array, matching MATLAB ``for`` iteration."""
+    """Yield the columns of an array, matching MATLAB ``for`` iteration.
+
+    Row vectors yield native Python scalars (one per element) so that scalar
+    loop bodies avoid per-iteration 1x1 array allocation.
+    """
     a = as_array(x)
     if isinstance(a, str):
         yield a
         return
+    if a.ndim == 2 and a.shape[0] == 1:
+        if _config.optimized:
+            # Row vector: yield each element as a native Python scalar.
+            for v in a[0].tolist():
+                yield v
+            return
+        for j in range(a.shape[1]):
+            yield a[:, j : j + 1]
+        return
+    if a.ndim == 2:
+        for j in range(a.shape[1]):
+            yield a[:, j].reshape(a.shape[0], 1)
+        return
     if a.ndim < 2:
         a = a.reshape(1, -1)
-    ncols = a.shape[1] if a.ndim >= 2 else 1
-    for j in range(ncols):
-        yield a[:, j].reshape(a.shape[0], 1) if a.ndim >= 2 else a[j].reshape(1, 1)
+        for v in a[0].tolist():
+            yield v
+        return
+    for j in range(a.shape[1]):
+        yield a[:, j].reshape(a.shape[0], 1)
 
 
 def linspace(a: Any, b: Any, n: Any = 100) -> np.ndarray:

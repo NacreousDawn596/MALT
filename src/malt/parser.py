@@ -125,6 +125,8 @@ class Parser:
                 return self.parse_for()
             if name == "while":
                 return self.parse_while()
+            if name == "switch":
+                return self.parse_switch()
             if name == "break":
                 return self.parse_break()
             if name == "continue":
@@ -270,6 +272,34 @@ class Parser:
         self.expect_block_end("while", start)
         return ast.WhileStatement(cond, body, start.location)
 
+    def parse_switch(self) -> ast.SwitchStatement:
+        start = self.advance()  # 'switch'
+        value = self.parse_expression()
+        self.skip_newlines()
+        cases: list[tuple[ast.Node, list[ast.Statement]]] = []
+        otherwise: list[ast.Statement] | None = None
+
+        while True:
+            self.skip_newlines()
+            tok = self.peek()
+            if tok.type == TokenType.IDENT and tok.value == "case":
+                self.advance()
+                self.skip_newlines()
+                test = self.parse_expression()
+                self.skip_newlines()
+                body = self.parse_block("case")
+                cases.append((test, body))
+                continue
+            if tok.type == TokenType.IDENT and tok.value == "otherwise":
+                self.advance()
+                self.skip_newlines()
+                otherwise = self.parse_block("otherwise")
+                break
+            break
+
+        self.expect_block_end("switch", start)
+        return ast.SwitchStatement(value, cases, otherwise, start.location)
+
     def parse_break(self) -> ast.BreakStatement:
         tok = self.advance()
         return ast.BreakStatement(tok.location)
@@ -304,7 +334,7 @@ class Parser:
                 self.error(f"missing 'end' for {owner!r} block", tok)
             if tok.type == TokenType.IDENT and tok.value == "end":
                 break
-            if tok.type == TokenType.IDENT and tok.value in ("elseif", "else"):
+            if tok.type == TokenType.IDENT and tok.value in ("elseif", "else", "case", "otherwise"):
                 break
             stmt = self.parse_statement()
             statements.append(stmt)

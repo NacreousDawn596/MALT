@@ -162,6 +162,14 @@ class WhileStatement(Statement):
 
 
 @dataclass
+class SwitchStatement(Statement):
+    value: Node
+    cases: list[tuple[Node, list[Statement]]]  # (test value, body)
+    otherwise: list[Statement] | None
+    location: SourceLocation
+
+
+@dataclass
 class BreakStatement(Statement):
     location: SourceLocation
 
@@ -213,6 +221,7 @@ __all__ = [
     "IfStatement",
     "ForStatement",
     "WhileStatement",
+    "SwitchStatement",
     "BreakStatement",
     "ContinueStatement",
     "ReturnStatement",

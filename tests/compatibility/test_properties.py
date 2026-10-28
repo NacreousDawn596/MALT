@@ -18,7 +18,7 @@ from malt.executor import execute
 def test_scalar_arithmetic_matches_reference(a, b):
     unit = compile_source(f"r = {a} + {b} * 2;", "p.m")
     ns = execute(unit)
-    assert float(ns["r"].reshape(-1)[0]) == a + b * 2
+    assert float(np.asarray(ns["r"])) == a + b * 2
 
 
 @settings(max_examples=50, deadline=None)

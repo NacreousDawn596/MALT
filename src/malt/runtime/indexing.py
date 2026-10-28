@@ -7,10 +7,29 @@ from typing import Any
 import numpy as np
 
 from ..errors import IndexError_, RuntimeError_
-from .arrays import as_array
+from .arrays import _config, as_array
 
 # Sentinel for the ``:`` colon argument.
 COLON = slice(None)
+
+
+def _scalar_idx(s: Any, n: int) -> int | None:
+    """Convert a scalar subscript to a 0-based int (bounds-checked).
+
+    Returns ``None`` if ``s`` is not a scalar subscript.
+    """
+    if isinstance(s, np.ndarray):
+        if s.size != 1:
+            return None
+        v = s.reshape(-1)[0]
+    elif isinstance(s, (int, float, complex, np.number)):
+        v = s
+    else:
+        return None
+    i = int(v)
+    if i < 1 or i > n:
+        raise IndexError_(f"index {i} is outside the valid range 1..{n}")
+    return i - 1
 
 
 def _resolve_index(s: Any) -> tuple[Any, str]:
@@ -21,12 +40,11 @@ def _resolve_index(s: Any) -> tuple[Any, str]:
     if s is COLON:
         return slice(None), "colon"
     a = as_array(s)
+    if a.size == 1:
+        return int(a.reshape(-1)[0]) - 1, "scalar"
     if a.dtype == bool:
         idx = np.flatnonzero(a.flatten())
         return idx, "vector"
-    a = a.astype(int)
-    if a.size == 1:
-        return int(a.reshape(-1)[0]) - 1, "scalar"
     return (a.flatten() - 1), "vector"
 
 
@@ -68,9 +86,13 @@ def _string_index(s: str, sub: Any) -> str:
 
 
 def _linear_index(a: np.ndarray, s: Any) -> np.ndarray:
-    flat = a.reshape(-1, order="F")
     if s is COLON:
-        return flat.reshape(-1, 1)
+        return a.reshape(-1, order="F").reshape(-1, 1)
+    i = _scalar_idx(s, a.size) if _config.optimized else None
+    if i is not None:
+        # ``reshape(order='F')`` is a view for vectors and a copy for matrices;
+        # reading either yields the correct MATLAB (column-major) element.
+        return np.array([[a.reshape(-1, order="F")[i]]])
     sa = as_array(s)
     if sa.dtype == bool:
         mask = sa.flatten()
@@ -78,11 +100,11 @@ def _linear_index(a: np.ndarray, s: Any) -> np.ndarray:
             raise IndexError_(
                 f"logical index has {mask.size} elements but array has {a.size}"
             )
-        return flat[mask].reshape(-1, 1)
+        return a.reshape(-1, order="F")[mask].reshape(-1, 1)
     idx = sa.astype(int)
     flat_idx = idx.flatten() - 1
-    _check_bounds(flat_idx, flat.size)
-    vals = flat[flat_idx]
+    _check_bounds(flat_idx, a.size)
+    vals = a.reshape(-1, order="F")[flat_idx]
     if idx.size == 1:
         return vals.reshape(1, 1)
     return vals.reshape(idx.shape)
@@ -165,6 +187,10 @@ def _linear_assign(a: np.ndarray, value: np.ndarray, s: Any) -> None:
     if s is COLON:
         a[:] = value.reshape(a.shape) if value.size == a.size else _expand(a, value)
         return
+    i = _scalar_idx(s, a.size) if _config.optimized else None
+    if i is not None:
+        _set_linear(a, i, value.reshape(-1)[0])
+        return
     sa = as_array(s)
     if sa.dtype == bool:
         mask = sa.flatten()
@@ -173,6 +199,17 @@ def _linear_assign(a: np.ndarray, value: np.ndarray, s: Any) -> None:
     idx = sa.astype(int).flatten() - 1
     _check_bounds(idx, a.size)
     a.reshape(-1, order="F")[idx] = value.flatten()
+
+
+def _set_linear(a: np.ndarray, i: int, v: Any) -> None:
+    """Write element ``i`` (0-based, column-major linear) in place."""
+    if a.ndim <= 1 or (a.ndim == 2 and (a.shape[0] == 1 or a.shape[1] == 1)):
+        # Contiguous vector: ``reshape(order='F')`` is a view.
+        a.reshape(-1, order="F")[i] = v
+    else:
+        r = i % a.shape[0]
+        c = i // a.shape[0]
+        a[r, c] = v
 
 
 def _expand(a: np.ndarray, value: np.ndarray) -> np.ndarray:

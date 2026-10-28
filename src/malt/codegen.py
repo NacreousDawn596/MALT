@@ -164,6 +164,15 @@ class CodeGenerator:
                 raise CodegenError(f"unknown unary operator {node.op!r}", node.location)
             return f"_ml.{fn}({self.gen_expr(node.operand)})"
         if isinstance(node, ast.BinaryOperation):
+            if node.op in ("&&", "||"):
+                # Short-circuit scalar logical operators: MATLAB evaluates the
+                # right operand only if needed and returns a logical scalar.
+                la = self.gen_expr(node.left)
+                rb = self.gen_expr(node.right)
+                op = "and" if node.op == "&&" else "or"
+                return (
+                    f"(1.0 if (_ml.is_true({la}) {op} _ml.is_true({rb})) else 0.0)"
+                )
             fn = _BINOP.get(node.op)
             if fn is None:
                 raise CodegenError(f"unknown operator {node.op!r}", node.location)
@@ -297,6 +306,8 @@ class CodeGenerator:
             self._gen_for(node)
         elif isinstance(node, ast.WhileStatement):
             self._gen_while(node)
+        elif isinstance(node, ast.SwitchStatement):
+            self._gen_switch(node)
         elif isinstance(node, ast.BreakStatement):
             self.emit("break")
         elif isinstance(node, ast.ContinueStatement):
@@ -358,7 +369,10 @@ class CodeGenerator:
     def _assign_single(self, t: ast.Node, node: ast.Assignment, rhs: str) -> None:
         if isinstance(t, ast.Identifier):
             self._check_identifier(t.name, t)
-            self.emit(f"{t.name} = _ml.as_array({rhs})")
+            # Runtime operations already return MATLAB-visible values (arrays or
+            # native scalars); literals are native Python numbers. No extra
+            # wrapping is required — ``as_array`` normalizes at boundaries.
+            self.emit(f"{t.name} = {rhs}")
             if not node.suppress:
                 self.emit(f"_ml.display({t.name})")
         elif isinstance(t, ast.FunctionCall):
@@ -440,6 +454,32 @@ class CodeGenerator:
         for s in node.body:
             self.gen_statement(s)
         self.indent -= 1
+
+    def _gen_switch(self, node: ast.SwitchStatement) -> None:
+        t = self.new_temp()
+        self.emit(f"{t} = {self.gen_expr(node.value)}")
+        for i, (test, body) in enumerate(node.cases):
+            kw = "if" if i == 0 else "elif"
+            self.emit(f"{kw} {self._switch_cond(t, test)}:")
+            self.indent += 1
+            for s in body:
+                self.gen_statement(s)
+            self.indent -= 1
+        if node.otherwise is not None:
+            self.emit("else:")
+            self.indent += 1
+            for s in node.otherwise:
+                self.gen_statement(s)
+            self.indent -= 1
+
+    def _switch_cond(self, t: str, test: ast.Node) -> str:
+        if isinstance(test, ast.CellLiteral):
+            parts = []
+            for row in test.rows:
+                for e in row:
+                    parts.append(f"_ml.is_true(_ml.isequal({t}, {self.gen_expr(e)}))")
+            return " or ".join(parts) if parts else "False"
+        return f"_ml.is_true(_ml.isequal({t}, {self.gen_expr(test)}))"
 
     def _gen_return(self, node: ast.ReturnStatement) -> None:
         if self._function_outputs is not None:

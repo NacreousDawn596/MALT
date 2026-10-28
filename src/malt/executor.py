@@ -82,6 +82,7 @@ def execute(unit: Any, namespace: dict[str, Any] | None = None) -> dict[str, Any
     if namespace is None:
         namespace = make_namespace()
     _ml.set_current_namespace(namespace)
+    _ml.set_optimization_level(getattr(unit, "optimization_level", 1))
     try:
         exec(unit.code, namespace)
     except ReturnSignal:

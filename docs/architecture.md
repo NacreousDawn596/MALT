@@ -38,6 +38,12 @@ NumPy `ndarray` with **at least two dimensions**. Scalars are 1x1, row vectors
 1xN, column vectors Nx1 — so NumPy's one-dimensional convention never leaks
 into MATLAB-visible semantics.
 
+Internally (optimization level 1, the default), scalar *intermediate* values
+flow as native Python numbers; `as_array` re-wraps them into 1x1 arrays only at
+semantic boundaries (display, indexing, `size`/`numel`, function arguments,
+matrix construction). This avoids allocating a 1x1 NumPy array for every scalar
+arithmetic operation in a loop.
+
 ## Key design decisions
 
 ### Code generation strategy
@@ -96,3 +102,21 @@ test suite inspects real Matplotlib artists, not printed output.
    through the actual runtime.
 3. Runtime errors are source-aware: they carry the original filename and line,
    and generic Python exceptions are converted to `MaltError` subclasses.
+
+## Performance
+
+- **Scalar fast paths.** Element-wise and matrix operators detect scalar
+  operands and use native Python arithmetic, avoiding 1x1 array allocation per
+  operation. `for_columns` yields native scalars for row-vector loop ranges.
+- **Indexing fast paths.** Scalar subscripts are bounds-checked and applied
+  without `astype`/`flatten`/min-max machinery.
+- **Compilation cache.** `compile_source` memoizes immutable artifacts (AST,
+  generated source, code object, source map) keyed on
+  `(source, filename, optimization_level)`; execution results and workspaces
+  are never cached.
+- **Optimization toggle.** `malt run --optimization-level 0|1` disables/enables
+  the native-scalar fast paths. Level 0 keeps scalars as 1x1 arrays (the slow,
+  always-correct reference); level 1 (default) uses native scalars. Both levels
+  are covered by differential tests.
+
+See `benchmarks/README.md` for measured before/after numbers and methodology.

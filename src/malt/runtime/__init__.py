@@ -75,6 +75,7 @@ from .arrays import (  # noqa: E402
     numel,
     peaks,
     scalar_value,
+    set_optimization_level,
     size,
 )
 from .calculus import fzero, integral, roots  # noqa: E402
