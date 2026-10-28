@@ -92,7 +92,11 @@ _BUILTINS = frozenset(
         "imagesc", "image", "colorbar", "contour", "contourf", "mesh", "surf",
         "view", "saveas", "exportgraphics", "who", "whos", "help",
         "struct", "fieldnames", "isfield", "iscell", "isstruct", "getfield",
-        "setfield", "feval", "func2str", "str2func",
+        "setfield", "feval", "func2str", "str2func", "any", "all",
+        "isnumeric", "ischar", "isempty", "isscalar", "isvector", "ismatrix",
+        "isrow", "iscolumn", "isreal", "isfloat", "islogical", "isnan",
+        "isinf", "isfinite", "lower", "upper", "strcmp", "strcmpi", "strcat",
+        "strjoin", "strsplit", "num2str",
     }
 )
 

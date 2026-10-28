@@ -257,3 +257,13 @@ def cumprod(x: Any, dim: Any | None = None) -> np.ndarray:
 def sort(x: Any, dim: Any | None = None) -> np.ndarray:
     a, d = _reduce_dim(x, dim)
     return np.sort(a, axis=d)
+
+
+def any_(x: Any, dim: Any | None = None) -> np.ndarray:
+    a, d = _reduce_dim(x, dim)
+    return np.any(a, axis=d, keepdims=True).astype(float)
+
+
+def all_(x: Any, dim: Any | None = None) -> np.ndarray:
+    a, d = _reduce_dim(x, dim)
+    return np.all(a, axis=d, keepdims=True).astype(float)

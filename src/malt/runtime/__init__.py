@@ -94,6 +94,30 @@ from .cells import (  # noqa: E402
     isstruct,
     struct,
 )
+from .compat import (  # noqa: E402
+    ischar,
+    iscolumn,
+    isempty,
+    isfinite,
+    isfloat,
+    isinf,
+    islogical,
+    ismatrix,
+    isnan,
+    isnumeric,
+    isreal,
+    isrow,
+    isscalar,
+    isvector,
+    lower,
+    num2str,
+    strcat,
+    strcmp,
+    strcmpi,
+    strjoin,
+    strsplit,
+    upper,
+)
 from .functions import (  # noqa: E402
     abs,
     acos,
@@ -138,6 +162,12 @@ from .functions import (  # noqa: E402
     tan,
     tanh,
     zeros,
+)
+from .functions import (
+    all_ as all,
+)
+from .functions import (
+    any_ as any,
 )
 from .functions import (
     max_ as max,
