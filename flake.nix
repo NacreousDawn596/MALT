@@ -33,19 +33,22 @@
 
         pythonEnv = python.withPackages pythonDeps;
 
-        # Installable wrapper: exposes `malt` (and its dependencies) without
-        # touching the host system. Point PYTHONPATH at the bundled source.
+        # Installable package: bundles the source into the store and exposes a
+        # `malt` wrapper. Depends only on the store (never `$PWD` or the host
+        # environment).
         maltPackage = pkgs.stdenv.mkDerivation {
           pname = "malt";
-          version = "0.1.0";
+          version = "0.2.0";
           src = self;
           buildInputs = [ pythonEnv ];
           buildPhase = "true";
           installPhase = ''
+            mkdir -p "$out/lib"
+            cp -r src/malt "$out/lib/malt"
             mkdir -p "$out/bin"
             cat > "$out/bin/malt" <<EOF
             #!${pkgs.runtimeShell}
-            export PYTHONPATH="\$PWD/src:\$PYTHONPATH"
+            export PYTHONPATH="$out/lib:\''${PYTHONPATH:-}"
             export MPLBACKEND="\''${MPLBACKEND:-Agg}"
             exec ${pythonEnv}/bin/python -m malt "\$@"
             EOF
