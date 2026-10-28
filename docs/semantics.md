@@ -204,16 +204,19 @@ Error categories (all are `MaltError` subclasses):
 
 1. **One numeric type** (double/complex only); no integer/single classes.
 2. **No array auto-growth** on out-of-range indexed assignment.
-3. **Presentation policy**: an unsuppressed assignment/expression in a script
+3. **Case-sensitivity**: MALT identifiers and function names are
+   case-sensitive; MATLAB is case-insensitive (`Inf` vs `inf`).
+4. **Presentation policy**: an unsuppressed assignment/expression in a script
    displays the value only (no `name =` echo); the REPL follows the same rule.
-4. **Unsupported**: `switch` is supported, but `try/catch`, cell arrays `{}`,
-   and structs are not (see `docs/language-support.md` and the pending specs in
-   `docs/specs/`).
-5. **Display formatting** is column-aligned but not byte-identical to MATLAB's
+5. **Char arithmetic**: MATLAB does ASCII arithmetic on `'char' + number`; MALT
+   rejects it (char arrays are not implemented).
+6. **Unsupported**: `switch` is supported, but `try/catch` is supported;
+   cell arrays `{}` and structs are not (see `docs/specs/`).
+7. **Display formatting** is column-aligned but not byte-identical to MATLAB's
    `disp` (numerical values match; string formatting may differ).
-6. **`&&`/`||` short-circuit** but, unlike MATLAB, are limited to scalar
+8. **`&&`/`||` short-circuit** but, unlike MATLAB, are limited to scalar
    operands (non-scalar raises) — this matches MATLAB's own scalar requirement.
-7. Seeded `rng` reproduces results **within MALT**, but the sequence is not
+9. Seeded `rng` reproduces results **within MALT**, but the sequence is not
    bit-identical to MathWorks MATLAB's.
 
 These are intentional; every one is tested. Anything else that behaves

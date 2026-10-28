@@ -83,6 +83,19 @@ _IDENT_START = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_")
 _IDENT_CONT = _IDENT_START | set("0123456789")
 _DIGITS = set("0123456789")
 
+# MATLAB single-quoted string escape sequences.
+_STRING_ESCAPES = {
+    "n": "\n",
+    "t": "\t",
+    "r": "\r",
+    "\\": "\\",
+    "'": "'",
+    "a": "\a",
+    "b": "\b",
+    "f": "\f",
+    "v": "\v",
+}
+
 
 class Lexer:
     def __init__(self, source: str, filename: str = "<malt>") -> None:
@@ -288,6 +301,16 @@ class Lexer:
                 break
             if ch == "\n":
                 self._error("newline in string literal (use a char vector without newline)")
+            if ch == "\\":
+                self._advance()
+                nxt = self._peek()
+                esc = _STRING_ESCAPES.get(nxt)
+                if esc is not None:
+                    chars.append(esc)
+                    self._advance()
+                    continue
+                chars.append("\\")
+                continue
             chars.append(ch)
             self._advance()
         self._emit(TokenType.STRING, "".join(chars), "'" + "".join(chars) + "'", loc)

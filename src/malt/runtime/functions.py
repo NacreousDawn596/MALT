@@ -211,9 +211,10 @@ def _reduce_dim(x: Any, dim: Any | None):
 
 
 def _first_non_singleton(a: np.ndarray) -> int:
-    """MATLAB reduces along the first dimension whose size exceeds 1."""
+    """MATLAB reduces along the first dimension whose size is not 1 (a size-0
+    dimension is non-singleton, so ``sum`` of an empty array is 0)."""
     for i in range(a.ndim):
-        if a.shape[i] > 1:
+        if a.shape[i] != 1:
             return i
     return 0
 

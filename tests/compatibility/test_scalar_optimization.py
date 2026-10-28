@@ -90,9 +90,18 @@ def test_scalar_exception():
 
     from malt.executor import execute as _ex
 
-    unit = _cs("x = 1 / 0;\n", "e.m")
+    unit = _cs("x = undefined_variable;\n", "e.m")
     with pytest.raises(MaltError):
         _ex(unit)
+
+
+def test_division_by_zero_is_inf_not_error():
+    # MATLAB semantics: 1/0 is Inf, 0/0 is NaN (not a runtime error).
+    import numpy as np
+
+    ns, _ = run_source("a = 1 / 0;\nb = 0 / 0;\n")
+    assert np.isinf(scalar(ns, "a"))
+    assert np.isnan(scalar(ns, "b"))
 
 
 def test_repeated_execution_no_state_leakage():

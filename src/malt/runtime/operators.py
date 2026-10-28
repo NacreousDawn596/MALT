@@ -9,6 +9,7 @@ MATLAB-visible behaviour.
 
 from __future__ import annotations
 
+import math
 import operator as _pyop
 from typing import Any
 
@@ -19,6 +20,21 @@ from .arrays import _config, as_array, is_scalar_like, py_scalar
 
 # Native Python numeric types that flow through scalar fast paths.
 _NATIVE = (int, float, complex)
+
+
+def _scalar_div(a: Any, b: Any) -> Any:
+    """MATLAB scalar division: ``a / b`` is ``Inf``/``NaN`` for a zero
+    denominator, never a Python ``ZeroDivisionError``."""
+    if isinstance(a, complex) or isinstance(b, complex):
+        with np.errstate(divide="ignore", invalid="ignore"):
+            return complex(np.divide(a, b))
+    if b != 0:
+        return a / b
+    if a == 0:
+        return float("nan")
+    sa = math.copysign(1.0, a)
+    sb = math.copysign(1.0, b)
+    return sa * sb * float("inf")
 
 # Python-native operators for the scalar fast path. The keys are the same
 # operator names used by ``_binop``; operands are already swapped for ``.\``.
@@ -41,6 +57,8 @@ _PYOP = {
 def _arith_binop(a: Any, b: Any, f: Any, opname: str) -> Any:
     """Element-wise arithmetic: native scalar result for scalar operands."""
     if _config.optimized and is_scalar_like(a) and is_scalar_like(b):
+        if opname in ("./", ".\\", "/", "\\"):
+            return _scalar_div(py_scalar(a), py_scalar(b))
         return _PYOP[opname](py_scalar(a), py_scalar(b))
     xa = as_array(a)
     xb = as_array(b)
@@ -101,14 +119,14 @@ def times(a: Any, b: Any) -> Any:
 def rdivide(a: Any, b: Any) -> Any:
     """Element-wise right division ``./``."""
     if _config.optimized and isinstance(a, _NATIVE) and isinstance(b, _NATIVE):
-        return a / b
+        return _scalar_div(a, b)
     return _arith_binop(a, b, np.divide, "./")
 
 
 def ldivide(a: Any, b: Any) -> Any:
     """Element-wise left division ``.\\`` (b ./ a)."""
     if _config.optimized and isinstance(a, _NATIVE) and isinstance(b, _NATIVE):
-        return b / a
+        return _scalar_div(b, a)
     return _arith_binop(b, a, np.divide, ".\\")
 
 
@@ -131,7 +149,7 @@ def mtimes(a: Any, b: Any) -> Any:
 def mldivide(a: Any, b: Any) -> Any:
     """MATLAB left division ``A \\ b`` (solve)."""
     if _config.optimized and isinstance(a, _NATIVE) and isinstance(b, _NATIVE):
-        return b / a
+        return _scalar_div(b, a)
     if _config.optimized and is_scalar_like(a) and is_scalar_like(b):
         return py_scalar(b) / py_scalar(a)
     xa = as_array(a)
@@ -152,7 +170,7 @@ def mldivide(a: Any, b: Any) -> Any:
 def mrdivide(a: Any, b: Any) -> Any:
     """MATLAB right division ``A / B`` (solve A = X B, i.e. X = A * inv(B))."""
     if _config.optimized and isinstance(a, _NATIVE) and isinstance(b, _NATIVE):
-        return a / b
+        return _scalar_div(a, b)
     if _config.optimized and is_scalar_like(a) and is_scalar_like(b):
         return py_scalar(a) / py_scalar(b)
     xa = as_array(a)

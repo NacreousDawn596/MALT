@@ -84,7 +84,7 @@ def _cycle_format(fmt: str, values: list[Any]) -> str:
     """Apply a MATLAB-style format string, cycling it when there are more
     values than conversion specifiers (as MATLAB ``fprintf`` does)."""
     if not values:
-        return fmt
+        return ""
     tokens: list[tuple[str, str]] = []
     last = 0
     for m in _SPEC_RE.finditer(fmt):
@@ -127,20 +127,18 @@ def _flatten_args(args: tuple[Any, ...]) -> list[Any]:
 
 def fprintf(fmt: Any, *args: Any) -> None:
     fmt = str(fmt)
-    converted = _flatten_args(args)
-    if not converted:
-        text = fmt
-    else:
-        text = _cycle_format(fmt, converted)
-    print(text, end="", file=sys.stdout)
+    if not args:
+        # No arguments: emit the format text literally.
+        print(fmt, end="", file=sys.stdout)
+        return
+    print(_cycle_format(fmt, _flatten_args(args)), end="", file=sys.stdout)
 
 
 def sprintf(fmt: Any, *args: Any) -> str:
     fmt = str(fmt)
-    converted = _flatten_args(args)
-    if not converted:
+    if not args:
         return fmt
-    return _cycle_format(fmt, converted)
+    return _cycle_format(fmt, _flatten_args(args))
 
 
 def clc() -> None:

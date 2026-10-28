@@ -92,6 +92,7 @@ docs/        architecture, language-support, nixos, testing
 ## Documentation
 
 - [Language semantics](docs/semantics.md) — the normative language reference
+- [Compatibility matrix](docs/compatibility-matrix.md) — implemented / partial / unsupported / different
 - [Architecture](docs/architecture.md)
 - [Supported language features](docs/language-support.md)
 - [NixOS setup](docs/nixos.md)

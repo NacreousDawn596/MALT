@@ -13,6 +13,19 @@ from .arrays import _config, as_array, py_scalar
 COLON = slice(None)
 
 
+def _to_int_index(v: Any) -> int:
+    """Convert a numeric scalar to a validated 1-based integer index."""
+    if isinstance(v, (complex, np.complexfloating)):
+        if v.imag != 0:
+            raise IndexError_("subscript indices must be real positive integers")
+        r = float(v.real)
+    else:
+        r = float(v)
+    if not r.is_integer():
+        raise IndexError_("subscript indices must be integers")
+    return int(r)
+
+
 def _scalar_idx(s: Any, n: int) -> int | None:
     """Convert a scalar subscript to a 0-based int (bounds-checked).
 
@@ -27,12 +40,7 @@ def _scalar_idx(s: Any, n: int) -> int | None:
         v = s.reshape(-1)[0]
     else:
         return None
-    if isinstance(v, (complex, np.complexfloating)):
-        if v.imag != 0:
-            raise IndexError_("subscript indices must be real positive integers")
-        i = int(v.real)
-    else:
-        i = int(v)
+    i = _to_int_index(v)
     if i < 1 or i > n:
         raise IndexError_(f"index {i} is outside the valid range 1..{n}")
     return i - 1
@@ -72,7 +80,7 @@ def _resolve_index(s: Any) -> tuple[Any, str]:
         return slice(None), "colon"
     a = as_array(s)
     if a.size == 1:
-        return int(a.reshape(-1)[0]) - 1, "scalar"
+        return _to_int_index(a.reshape(-1)[0]) - 1, "scalar"
     if a.dtype == bool:
         idx = np.flatnonzero(a.flatten())
         return idx, "vector"

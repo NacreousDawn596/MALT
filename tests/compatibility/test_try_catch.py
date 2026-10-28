@@ -54,7 +54,7 @@ def test_catch_var_persists_after_block():
 
 def test_nested_try_catch():
     ns, _ = run_source(
-        "r = 0;\ntry\n try\n  x = 1 / 0;\n catch\n  r = r + 1;\n end\ncatch\n r = r + 100;\nend\n"
+        "r = 0;\ntry\n try\n  x = undefined_var(1);\n catch\n  r = r + 1;\n end\ncatch\n r = r + 100;\nend\n"
     )
     assert scalar(ns, "r") == 1  # inner catch handled it
 
