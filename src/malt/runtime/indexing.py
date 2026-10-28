@@ -16,20 +16,51 @@ COLON = slice(None)
 def _scalar_idx(s: Any, n: int) -> int | None:
     """Convert a scalar subscript to a 0-based int (bounds-checked).
 
-    Returns ``None`` if ``s`` is not a scalar subscript.
+    Returns ``None`` if ``s`` is not a scalar subscript. Native numeric types
+    are checked first because they are the common case in scalar loops.
     """
-    if isinstance(s, np.ndarray):
+    if isinstance(s, (int, float, complex, np.number)):
+        v = s
+    elif isinstance(s, np.ndarray):
         if s.size != 1:
             return None
         v = s.reshape(-1)[0]
-    elif isinstance(s, (int, float, complex, np.number)):
-        v = s
     else:
         return None
-    i = int(v)
+    if isinstance(v, (complex, np.complexfloating)):
+        if v.imag != 0:
+            raise IndexError_("subscript indices must be real positive integers")
+        i = int(v.real)
+    else:
+        i = int(v)
     if i < 1 or i > n:
         raise IndexError_(f"index {i} is outside the valid range 1..{n}")
     return i - 1
+
+
+def _flat_get(a: np.ndarray, i: int) -> Any:
+    """Column-major linear scalar read (``i`` 0-based), no reshape for vectors."""
+    if a.ndim == 2:
+        if a.shape[0] == 1:
+            return a[0, i]
+        if a.shape[1] == 1:
+            return a[i, 0]
+        return a[i % a.shape[0], i // a.shape[0]]
+    return a.reshape(-1, order="F")[i]
+
+
+def _flat_set(a: np.ndarray, i: int, v: Any) -> None:
+    """Column-major linear scalar write (``i`` 0-based), in place."""
+    if a.ndim == 2:
+        if a.shape[0] == 1:
+            a[0, i] = v
+            return
+        if a.shape[1] == 1:
+            a[i, 0] = v
+            return
+        a[i % a.shape[0], i // a.shape[0]] = v
+        return
+    a.reshape(-1, order="F")[i] = v
 
 
 def _resolve_index(s: Any) -> tuple[Any, str]:
@@ -80,7 +111,7 @@ def index(A: Any, *subs: Any) -> Any:
 
 def _fast_linear_read(a: np.ndarray, i: int) -> Any:
     """Column-major linear scalar read returning a native Python scalar."""
-    v = a.reshape(-1, order="F")[i]
+    v = _flat_get(a, i)
     return v.item() if isinstance(v, np.generic) else v
 
 
@@ -218,13 +249,7 @@ def _linear_assign(a: np.ndarray, value: np.ndarray, s: Any) -> None:
 
 def _set_linear(a: np.ndarray, i: int, v: Any) -> None:
     """Write element ``i`` (0-based, column-major linear) in place."""
-    if a.ndim <= 1 or (a.ndim == 2 and (a.shape[0] == 1 or a.shape[1] == 1)):
-        # Contiguous vector: ``reshape(order='F')`` is a view.
-        a.reshape(-1, order="F")[i] = v
-    else:
-        r = i % a.shape[0]
-        c = i // a.shape[0]
-        a[r, c] = v
+    _flat_set(a, i, v)
 
 
 def _expand(a: np.ndarray, value: np.ndarray) -> np.ndarray:

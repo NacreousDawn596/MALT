@@ -109,14 +109,19 @@ test suite inspects real Matplotlib artists, not printed output.
   operands and use native Python arithmetic, avoiding 1x1 array allocation per
   operation. `for_columns` yields native scalars for row-vector loop ranges.
 - **Indexing fast paths.** Scalar subscripts are bounds-checked and applied
-  without `astype`/`flatten`/min-max machinery.
+  directly (`_flat_get`/`_flat_set` use column-major index arithmetic for row
+  vectors, column vectors, and matrices without `reshape`/`flatten`), avoiding
+  per-iteration allocation in indexed-assignment loops.
 - **JIT-specialized scalar loops (level 2).** A `for k = a:s:b` loop whose body
-  is a single scalar accumulation `X = X op f(k)` (RHS may not reference `X`)
-  is lowered to a native-arithmetic Python function and driven by
-  `_ml.jit_for`, which selects a Python `range` for integer ranges and falls
-  back to `colon`/`for_columns` otherwise. This is conservative and
-  semantically safe: the accumulator only ever combines with the scalar loop
-  variable, which is element-wise in both MATLAB and native Python.
+  is a sequence of scalar accumulations `X = X op f(k)` (each RHS references
+  only `k` and literals, never the accumulator) is lowered to a
+  native-arithmetic Python function and driven by `_ml.jit_for` (one
+  accumulator) or `_ml.jit_loop` (several independent accumulators). The
+  runtime selects a Python `range` for integer ranges and falls back to
+  `colon`/`for_columns` otherwise. This is conservative and semantically safe:
+  the accumulator only ever combines with the scalar loop variable, which is
+  element-wise in both MATLAB and native Python. Eligibility is explicit and
+  everything else falls back to the general loop.
 - **Compilation cache.** `compile_source` memoizes immutable artifacts (AST,
   generated source, code object, source map) keyed on
   `(source, filename, optimization_level)`; execution results and workspaces

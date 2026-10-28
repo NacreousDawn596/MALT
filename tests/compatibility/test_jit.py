@@ -68,3 +68,25 @@ def test_jit_nested_across_levels():
     src = "n = 50;\ns = 0;\nfor i = 1:n\n for j = 1:n\n  s = s + i*j;\n end\nend\n"
     vals = [scalar(_run(src, lvl), "s") for lvl in (0, 1, 2)]
     assert vals[0] == vals[1] == vals[2]
+
+
+def test_jit_multi_accumulator():
+    ns = _run("s = 0;\np = 1;\nfor k = 1:5\n s = s + k;\n p = p * k;\nend\n")
+    assert scalar(ns, "s") == 15
+    assert scalar(ns, "p") == 120
+
+
+def test_jit_multi_accumulator_matches_levels():
+    src = "s = 0;\np = 1;\nt = 0;\nfor k = 1:6\n s = s + k;\n p = p * k;\n t = t + k*k;\nend\n"
+    results = {}
+    for lvl in (0, 1, 2):
+        ns = _run(src, lvl)
+        results[lvl] = (scalar(ns, "s"), scalar(ns, "p"), scalar(ns, "t"))
+    assert results[0] == results[1] == results[2]
+
+
+def test_jit_rejects_accumulator_reference_in_rhs():
+    # s = s * s would be matmul-vs-elementwise unsafe; must not be JIT'd,
+    # but must still produce the correct result via the general path.
+    ns = _run("s = 2;\nfor k = 1:3\n s = s * s;\nend\n")
+    assert scalar(ns, "s") == 2 ** (2**3)  # 2 -> 4 -> 16 -> 256

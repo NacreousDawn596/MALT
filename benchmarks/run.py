@@ -16,6 +16,8 @@ import time
 from contextlib import redirect_stdout
 from io import StringIO
 
+import numpy as np
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from common import measure  # noqa: E402
@@ -133,24 +135,53 @@ def bench_end_to_end():
     print(measure(re_compile, 100, 5, "repeated compile+execute").summarize("us"))
 
 
+def bench_optimization_levels():
+    print("\n-- optimization levels (same workload) --")
+    src = load("scalar_loop.m")
+    for lvl in (0, 1, 2):
+        unit = compile_source(src, "s.m", optimization_level=lvl)
+        _quiet_execute(unit)
+        ns = _quiet_execute(unit)
+        assert float(np.asarray(ns["total"]).reshape(-1)[0]) == 5000050000.0
+        m = measure(lambda unit=unit: _quiet_execute(unit), 10, 2, f"scalar_loop 100k, level {lvl}")
+        print(m.summarize("ms"))
+
+
+def bench_cold_warm_cache():
+    print("\n-- cold vs warm compilation cache --")
+    src = load("repeated_execution.m")
+    cache_clear()
+
+    def cold():
+        cache_clear()
+        compile_source(src, "c.m")
+
+    def warm():
+        compile_source(src, "c.m")
+
+    print(measure(cold, 200, 5, "cold (cache miss, full compile)").summarize("us"))
+    print(measure(warm, 2000, 5, "warm (cache hit)").summarize("us"))
+
+
 def main() -> int:
     t0 = time.perf_counter()
+    import matplotlib
+    import numpy
+    import scipy
+
     print("== MALT benchmark ==")
-    print(f"quick={QUICK} python={sys.version.split()[0]}")
-    print(f"cpu={os.cpu_count()} cores")
+    print(f"python={sys.version.split()[0]}  quick={QUICK}  cpu={os.cpu_count()} cores")
+    print(f"numpy={numpy.__version__} scipy={scipy.__version__} matplotlib={matplotlib.__version__}")
     print()
 
     print("-- compiler stages --")
     bench_compiler()
 
-    print("\n-- runtime --")
     bench_runtime()
-
-    print("\n-- numerical --")
+    bench_optimization_levels()
     bench_numerical()
-
-    print("\n-- end-to-end --")
     bench_end_to_end()
+    bench_cold_warm_cache()
 
     print(f"\ntotal wall {time.perf_counter() - t0:.2f}s")
     return 0

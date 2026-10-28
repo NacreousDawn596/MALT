@@ -29,9 +29,15 @@ class Measurement:
         med = self.median * scale
         lo = self.min * scale
         hi = self.max * scale
+        try:
+            q1 = statistics.quantiles(self.samples_s, n=4)[0] * scale
+            q3 = statistics.quantiles(self.samples_s, n=4)[2] * scale
+            spread = f"iqr=[{q1:.3f}, {q3:.3f}]"
+        except statistics.StatisticsError:
+            spread = "iqr=n/a"
         return (
             f"{self.label:<42} median={med:10.3f} {unit}  "
-            f"min={lo:10.3f} max={hi:10.3f}  n={len(self.samples_s)}"
+            f"min={lo:10.3f} max={hi:10.3f}  {spread}  n={len(self.samples_s)}"
         )
 
 

@@ -470,6 +470,7 @@ class CodeGenerator:
         if self.optimization_level >= 2 and self._try_gen_for_jit(node):
             return
         it = self.gen_expr(node.iterable)
+        self.emit(f"{node.var} = _ml.for_init()")
         self.emit(f"for {node.var} in _ml.for_columns({it}):")
         self.indent += 1
         if not node.body:
@@ -479,59 +480,72 @@ class CodeGenerator:
         self.indent -= 1
 
     def _try_gen_for_jit(self, node: ast.ForStatement) -> bool:
-        """JIT-specialize ``for k = a:s:b`` scalar accumulation loops.
+        """JIT-specialize ``for k = a:s:b`` scalar reduction loops.
 
-        Only the provably scalar reduction pattern is specialized: a single
-        assignment ``X = X op <scalar expr over k only>``. The RHS may not
-        reference the accumulator, so a matrix ``X`` only ever combines with a
-        scalar (element-wise in both MATLAB and native Python), which is safe.
-        The loop body is emitted as a native-arithmetic Python function and the
-        range is specialized to ``range``/``colon`` at runtime by
-        ``_ml.jit_for``.
+        Each body statement must be a scalar accumulation ``X = X op f(k)``
+        where the RHS references only the loop variable and numeric literals
+        (never the accumulator, so a matrix ``X`` only ever combines with a
+        scalar, which is element-wise in both MATLAB and native Python).
+        Single accumulators use ``_ml.jit_for``; multiple distinct accumulators
+        use ``_ml.jit_loop``. Everything else falls back to the general loop.
         """
         if not isinstance(node.iterable, ast.ColonExpression):
             return False
-        if len(node.body) != 1:
+        if not node.body:
             return False
-        stmt = node.body[0]
-        if not isinstance(stmt, ast.Assignment) or stmt.op != "=":
-            return False
-        if len(stmt.targets) != 1 or not isinstance(stmt.targets[0], ast.Identifier):
-            return False
-        target = stmt.targets[0].name
-        self._check_identifier(target, stmt)
-        value = stmt.value
-        # Accumulation form X = X op rhs(k), rhs must not reference X.
-        if not isinstance(value, ast.BinaryOperation):
-            return False
-        if value.op not in _SCALAR_INLINE_BINOP:
-            return False
-        if not isinstance(value.left, ast.Identifier) or value.left.name != target:
-            return False
-        if not self._is_scalar_expr(value.right, {node.var}):
-            return False
+        accs: list[tuple[str, ast.BinaryOperation]] = []
+        for stmt in node.body:
+            if not isinstance(stmt, ast.Assignment) or stmt.op != "=":
+                return False
+            if len(stmt.targets) != 1 or not isinstance(stmt.targets[0], ast.Identifier):
+                return False
+            target = stmt.targets[0].name
+            if target == node.var or target in [a for a, _ in accs]:
+                return False
+            self._check_identifier(target, stmt)
+            value = stmt.value
+            if not isinstance(value, ast.BinaryOperation):
+                return False
+            if value.op not in _SCALAR_INLINE_BINOP:
+                return False
+            if not isinstance(value.left, ast.Identifier) or value.left.name != target:
+                return False
+            if not self._is_scalar_expr(value.right, {node.var}):
+                return False
+            accs.append((target, value))
 
+        names = [a for a, _ in accs]
         fn_name = self.new_temp()
-        self.emit(f"def {fn_name}({target}, {node.var}):")
+        self.emit(f"def {fn_name}({', '.join(names)}, {node.var}):")
         self.indent += 1
         old_inline = self.inline_scalar
         self.inline_scalar = True
         try:
-            expr = self.gen_expr(value)
+            for target, value in accs:
+                self.emit(f"{target} = {self.gen_expr(value)}")
         finally:
             self.inline_scalar = old_inline
-        self.emit(f"return {expr}")
+        if len(accs) == 1:
+            self.emit(f"return {names[0]}")
+        else:
+            self.emit(f"return ({', '.join(names)},)")
         self.indent -= 1
 
         start = self.gen_expr(node.iterable.start)
         end = self.gen_expr(node.iterable.end)
-        if node.iterable.step is not None:
-            step = self.gen_expr(node.iterable.step)
+        step = self.gen_expr(node.iterable.step) if node.iterable.step is not None else "1.0"
+
+        if len(accs) == 1:
+            self.emit(
+                f"{names[0]}, {node.var} = _ml.jit_for({names[0]}, {start}, {step}, {end}, {fn_name})"
+            )
         else:
-            step = "1.0"
-        self.emit(
-            f"{target}, {node.var} = _ml.jit_for({target}, {start}, {step}, {end}, {fn_name})"
-        )
+            tup = "(" + ", ".join(names) + ")"
+            tmp = self.new_temp()
+            self.emit(
+                f"{tmp}, {node.var} = _ml.jit_loop({tup}, {start}, {step}, {end}, {fn_name})"
+            )
+            self.emit(f"{', '.join(names)} = {tmp}")
         return True
 
     def _is_scalar_expr(self, node: ast.Node, allowed: set[str]) -> bool:

@@ -305,6 +305,15 @@ def for_columns(x: Any):
         yield a[:, j].reshape(a.shape[0], 1)
 
 
+def for_init() -> np.ndarray:
+    """Empty row vector used to initialize a loop variable before a ``for``.
+
+    MATLAB assigns the loop variable to the empty array when a loop iterates
+    zero times, so the variable is pre-bound to an empty value in all cases.
+    """
+    return np.empty((1, 0))
+
+
 def _as_int(x: Any) -> int | None:
     """Return the integer value of ``x`` if it is integer-valued, else None."""
     if isinstance(x, np.ndarray):
@@ -328,7 +337,8 @@ def jit_for(acc: Any, start: Any, step: Any, end: Any, body: Any) -> tuple[Any, 
     Iterates the MATLAB colon range ``start:step:end``, applying ``body(acc, k)``
     each iteration. Integer ranges use Python ``range``; non-integer ranges fall
     back to ``colon`` + ``for_columns``. Returns ``(acc, last_k)`` where
-    ``last_k`` is the final loop value (MATLAB leaves the loop variable set).
+    ``last_k`` is a native scalar (matching ``for_columns``) or an empty array
+    for an empty range.
     """
     s = _as_int(start)
     t = _as_int(step)
@@ -343,13 +353,41 @@ def jit_for(acc: Any, start: Any, step: Any, end: Any, body: Any) -> tuple[Any, 
             for k in range(s, e - 1, t):
                 acc = body(acc, k)
                 last = k
-        return acc, (np.array([[float(last)]]) if last is not None else np.empty((1, 0)))
+        return acc, (float(last) if last is not None else np.empty((1, 0)))
     # General fallback with MATLAB colon semantics.
     last = None
     for k in for_columns(colon(start, step, end)):
         acc = body(acc, k)
         last = k
     return acc, (last if last is not None else np.empty((1, 0)))
+
+
+def jit_loop(accs: tuple, start: Any, step: Any, end: Any, body: Any) -> tuple[Any, Any]:
+    """Multi-accumulator JIT loop.
+
+    ``accs`` is a tuple of accumulator values; ``body(*accs, k)`` returns the
+    updated tuple. Returns ``(accs, last_k)``, where ``last_k`` is a native
+    scalar or an empty array for an empty range.
+    """
+    s = _as_int(start)
+    t = _as_int(step)
+    e = _as_int(end)
+    if s is not None and t is not None and e is not None and t != 0:
+        last: int | None = None
+        if t > 0:
+            for k in range(s, e + 1, t):
+                accs = body(*accs, k)
+                last = k
+        else:
+            for k in range(s, e - 1, t):
+                accs = body(*accs, k)
+                last = k
+        return accs, (float(last) if last is not None else np.empty((1, 0)))
+    last = None
+    for k in for_columns(colon(start, step, end)):
+        accs = body(*accs, k)
+        last = k
+    return accs, (last if last is not None else np.empty((1, 0)))
 
 
 def linspace(a: Any, b: Any, n: Any = 100) -> np.ndarray:
