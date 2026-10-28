@@ -38,7 +38,7 @@
         # environment).
         maltPackage = pkgs.stdenv.mkDerivation {
           pname = "malt";
-          version = "0.2.0";
+          version = "0.3.0";
           src = self;
           buildInputs = [ pythonEnv ];
           buildPhase = "true";

@@ -30,7 +30,7 @@ The normative semantics are in `docs/semantics.md`; the tests are in `tests/`
 | `:` (colon) | ✅ | exact MATLAB semantics incl. empty/float/negative step |
 | `=` assignment | ✅ | |
 | augmented assignment `+= -= *= …` | 🔸 | a MALT extension; not MATLAB |
-| field access `a.b` | ⚠️ | only on `try/catch` error values |
+| field access `a.b` | ⚠️ | on structs and `try/catch` error values |
 | case-insensitivity | 🔸 | MALT identifiers are case-sensitive; MATLAB is not |
 
 ## Arrays and indexing
@@ -47,8 +47,8 @@ The normative semantics are in `docs/semantics.md`; the tests are in `tests/`
 | Out-of-bounds index | ✅ | errors (like MATLAB) |
 | Non-integer / complex index | ✅ | errors (like MATLAB) |
 | Array auto-growth on out-of-range assignment | 🔸 | MALT errors; MATLAB grows the array |
-| Cell arrays `{}` | ❌ | spec written (`docs/specs/cell-arrays.md`) |
-| Structs | ❌ | spec written (`docs/specs/structs.md`) |
+| Cell arrays `{}` | ⚠️ | `{}` literals, `c{idx}` content access/assign, `iscell`; no `c(idx)` slices, `c{:}`, or `cell(n)` |
+| Structs | ⚠️ | `struct`, dot read/write, `fieldnames`, `isfield`, `isstruct`; no struct arrays |
 
 ## Control flow
 
@@ -70,7 +70,7 @@ The normative semantics are in `docs/semantics.md`; the tests are in `tests/`
 | `function [a,b] = f(x,y)` (multi-output) | ✅ | |
 | Local scope, hoisted script functions | ✅ | |
 | Anonymous functions `@(x) …` | ✅ | |
-| Function handles `@name` | ✅ | |
+| Function handles `@name` | ✅ | `@name`, `func2str`, `str2func`, `feval` |
 | `nargin`/`nargout`, `varargin`/`varargout` | ❌ | |
 | Nested functions | ❌ | |
 
@@ -83,7 +83,10 @@ The normative semantics are in `docs/semantics.md`; the tests are in `tests/`
 | `zeros ones eye rand randn linspace logspace rng` | ✅ | |
 | `reshape repmat diag meshgrid peaks` | ✅ | |
 | Reductions `sum prod mean min max cumsum cumprod sort` | ✅ | first non-singleton dimension |
+| `any all` | ✅ | logical reduction along first non-singleton dimension |
 | `size length numel ndims isequal` | ✅ | |
+| Type predicates `isnumeric ischar isempty isscalar isvector ismatrix isrow iscolumn isreal isfloat islogical isnan isinf isfinite` | ✅ | |
+| String helpers `lower upper strcmp strcmpi strcat strjoin strsplit num2str` | ✅ | |
 | Linear algebra `det inv rank trace norm cond eig svd lu qr chol pinv polyfit` | ✅ | |
 | `\` `/` (solve; singular → least squares) | ✅ | |
 | `eig`/`eigvals` (sorted ascending, real when applicable) | ✅ | |

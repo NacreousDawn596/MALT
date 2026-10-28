@@ -3,6 +3,25 @@
 All notable changes to MALT are documented here. This project follows
 `major.minor.patch`; within `0.x`, breaking changes bump the minor version.
 
+## [0.3.0] — unreleased
+
+### Added
+- Cell arrays: `{...}` literals, `c{idx}` content access (linear and 2-D
+  subscripts), `c{idx} = value` content assignment, `c{end}`, and `iscell`.
+- Structs: `struct('f', v, …)`, dot-field read (`s.f`) and write (`s.f = v`),
+  `fieldnames`, `isfield`, `isstruct`, and missing-field errors.
+- Function handles: `func2str`, `str2func`, `feval`, and a named-handle wrapper
+  so `@sin` round-trips through `func2str`/`str2func`.
+- Compatibility predicates: `isnumeric ischar isempty isscalar isvector
+  ismatrix isrow iscolumn isreal isfloat islogical isnan isinf isfinite`.
+- `any`/`all` logical reductions (first non-singleton dimension).
+- String helpers: `lower upper strcmp strcmpi strcat strjoin strsplit num2str`.
+- Spec docs for cell arrays and structs moved from "planned" to "implemented".
+
+### Limitations
+- Cell *slice* access (`c(idx)`) and `cell(n)`/`cell(m,n)` constructors are not
+  implemented; struct arrays (`struct('f', {v1, v2})`) are deferred.
+
 ## [0.2.0] — unreleased
 
 ### Added
