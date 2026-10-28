@@ -93,6 +93,7 @@ docs/        architecture, language-support, nixos, testing
 
 - [Language semantics](docs/semantics.md) — the normative language reference
 - [Compatibility matrix](docs/compatibility-matrix.md) — implemented / partial / unsupported / different
+- [Runtime and API](docs/api.md) — Python API, compiler options, error model
 - [Architecture](docs/architecture.md)
 - [Supported language features](docs/language-support.md)
 - [NixOS setup](docs/nixos.md)
