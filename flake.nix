@@ -45,8 +45,8 @@
         pythonEnv = python.withPackages pythonDeps;
 
         # Installable package: bundles the source into the store and exposes a
-        # `malt` wrapper. Depends only on the store (never `$PWD` or the host
-        # environment).
+        # `malt` wrapper (plus a `malt-gui` launcher). Depends only on the
+        # store (never `$PWD` or the host environment).
         maltPackage = pkgs.stdenv.mkDerivation {
           pname = "malt";
           version = "0.3.0";
@@ -65,8 +65,34 @@
             export MALT_QT6_PLUGIN_PATH="${qt6base}/${qt6base.qtPluginPrefix}/platforms"
             exec ${pythonEnv}/bin/python -m malt "\$@"
             EOF
-            chmod +x "$out/bin/malt"
+            cat > "$out/bin/malt-gui" <<EOF
+            #!${pkgs.runtimeShell}
+            exec "$out/bin/malt" gui "\$@"
+            EOF
+            chmod +x "$out/bin/malt" "$out/bin/malt-gui"
+
+            # Desktop entry + icon for the GUI.
+            mkdir -p "$out/share/applications"
+            cat > "$out/share/applications/malt.desktop" <<EOF
+            [Desktop Entry]
+            Type=Application
+            Name=MALT
+            Comment=Interactive notebook REPL for the MALT language
+            Exec=malt-gui
+            Icon=malt
+            Terminal=false
+            Categories=Development;Science;Math;
+            EOF
+            mkdir -p "$out/share/icons/hicolor/256x256/apps"
+            cp assets/logo.png "$out/share/icons/hicolor/256x256/apps/malt.png"
           '';
+          meta = {
+            description = "A MATLAB-compatible language runtime powered by CPython";
+            license = pkgs.lib.licenses.mit;
+            homepage = "https://github.com/NacreousDawn596/MALT";
+            mainProgram = "malt";
+            platforms = pkgs.lib.platforms.unix;
+          };
         };
       in
       {
@@ -95,5 +121,13 @@
         };
 
         packages.default = maltPackage;
+        apps.default = {
+          type = "app";
+          program = "${maltPackage}/bin/malt";
+        };
+        apps.gui = {
+          type = "app";
+          program = "${maltPackage}/bin/malt-gui";
+        };
       });
 }

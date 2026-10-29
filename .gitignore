@@ -20,6 +20,9 @@ result-*
 test_plot.png
 *.png
 
+# Application assets are committed intentionally.
+!assets/logo.png
+
 # Machine-specific benchmark results (never committed as universal guarantees)
 benchmarks/results/*.txt
 benchmarks/results/*.json
