@@ -68,7 +68,7 @@
             export PYTHONPATH="$PWD/src:$PYTHONPATH"
             # Headless by default so tests never require a display. Override
             # with `export MPLBACKEND=Qt5Agg` for interactive figure windows.
-            export MPLBACKEND=Agg
+            export MPLBACKEND=''${MPLBACKEND:-Agg}
             echo "MALT development shell (nixpkgs ${nixpkgs.lib.version})"
             echo "  python:      $(python --version 2>&1)"
             echo "  run tests:   nix develop -c pytest"

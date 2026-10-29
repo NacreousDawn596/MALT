@@ -516,6 +516,22 @@ def show() -> None:
     plt.show()
 
 
+# Headless ("hardcopy") backends have no window to open; ``plt.show`` on them
+# only emits a warning, so skip it entirely.
+_NON_INTERACTIVE_BACKENDS = frozenset(
+    {"agg", "cairo", "pdf", "pgf", "ps", "svg", "template"}
+)
+
+
+def show_if_any() -> None:
+    """Display any open figures (a no-op under headless backends like ``Agg``)."""
+    if not plt.get_fignums():
+        return
+    if matplotlib.get_backend().lower() in _NON_INTERACTIVE_BACKENDS:
+        return
+    plt.show()
+
+
 # Accessors used by the graphics test suite.
 def figure_count() -> int:
     return len(plt.get_fignums())

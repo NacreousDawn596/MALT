@@ -91,6 +91,7 @@ _BUILTINS = frozenset(
         "stairs", "semilogy", "semilogx", "loglog", "errorbar", "fill",
         "imagesc", "image", "colorbar", "contour", "contourf", "mesh", "surf",
         "view", "saveas", "exportgraphics", "who", "whos", "help",
+        "show", "drawnow",
         "struct", "fieldnames", "isfield", "iscell", "isstruct", "getfield",
         "setfield", "feval", "func2str", "str2func", "any", "all",
         "isnumeric", "ischar", "isempty", "isscalar", "isvector", "ismatrix",

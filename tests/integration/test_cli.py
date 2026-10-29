@@ -63,3 +63,28 @@ def test_error_returns_nonzero(tmp_path, capsys):
     assert rc == 1
     err = capsys.readouterr().err
     assert "bad.m" in err
+
+
+def test_run_plot_autoshow_is_noop_headless(tmp_path, capsys):
+    f = tmp_path / "plot.m"
+    f.write_text("plot([1 2 3], [4 5 6]);\n")
+    rc = main(["run", str(f)])
+    assert rc == 0
+    out = capsys.readouterr().out
+    # Under the headless Agg backend, auto-show is a silent no-op.
+    assert "non-interactive" not in out
+
+
+def test_show_and_drawnow_are_builtins(tmp_path, capsys):
+    f = tmp_path / "show.m"
+    f.write_text("plot([1 2 3]);\ndrawnow;\n")
+    rc = main(["run", str(f)])
+    assert rc == 0
+
+
+def test_show_compiles_to_show_call(tmp_path, capsys):
+    f = tmp_path / "show.m"
+    f.write_text("show;\n")
+    rc = main(["run", str(f), "--show-generated"])
+    assert rc == 0
+    assert "_ml.show()" in capsys.readouterr().out

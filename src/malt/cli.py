@@ -10,6 +10,7 @@ from .compiler import compile_source
 from .diagnostics import render_error
 from .errors import MaltError
 from .executor import execute
+from .runtime import graphics as _graphics
 
 
 def _compile_file(path: str, optimization_level: int = 1):
@@ -25,6 +26,7 @@ def cmd_eval(args: argparse.Namespace) -> int:
             print(unit.show_generated())
             return 0
         execute(unit)
+        _graphics.show_if_any()
         return 0
     except MaltError as e:
         print(render_error(e, source=args.expression), file=sys.stderr)
@@ -40,6 +42,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             print(unit.show_generated())
             return 0
         execute(unit)
+        _graphics.show_if_any()
         return 0
     except MaltError as e:
         print(render_error(e), file=sys.stderr)

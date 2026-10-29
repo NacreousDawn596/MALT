@@ -48,6 +48,10 @@ Interactive figure windows require a display server and a GUI backend:
 MPLBACKEND=Qt5Agg nix develop -c python -m malt run examples/graphics/sine_plot.m
 ```
 
+`malt run` auto-displays any open figures on exit (like MATLAB). Under the
+default headless `Agg` backend that is a silent no-op — use
+`saveas`/`exportgraphics` to render PNGs there.
+
 ## CLI
 
 ```

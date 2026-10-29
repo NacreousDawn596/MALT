@@ -40,6 +40,11 @@ To open real figure windows, select a GUI backend and provide a display server:
 MPLBACKEND=Qt5Agg nix develop -c python -m malt run examples/graphics/sine_plot.m
 ```
 
+`malt run` (and `malt eval`) automatically display any open figures when the
+process finishes — the equivalent of MATLAB's implicit `show`. Under the
+default headless `Agg` backend this is a silent no-op, so scripts that only
+render to PNG via `saveas`/`exportgraphics` are unaffected.
+
 Qt support is compiled into the Matplotlib override (`enableQt = true`);
 Tk is available too (`enableTk = true`). Which backend works depends on your
 desktop environment. On headless NixOS hosts, use `Agg` and `saveas`/`exportgraphics`.
