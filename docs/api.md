@@ -42,6 +42,7 @@ Compiles MATLAB source into an in-memory CPython code object. Returns a
 | `code` | the compiled code object |
 | `source_map` | generated-line → source-location map |
 | `diagnostics` | per-loop JIT specialization decisions |
+| `warnings` | non-fatal `Diagnostic` objects (see below) |
 | `show_generated()` | generated Python with a header |
 | `coverage_report()` | human-readable JIT coverage summary |
 
@@ -90,16 +91,40 @@ Every `MaltError` has:
 - `.message` — the human-readable message.
 - `.location` — a `SourceLocation` (`filename`, `line`, `column`) or `None`.
 - `.category` — the stable category string (see the error model below).
+- `.code` — a stable, tool-friendly identifier such as `E2001`.
+- `.hint` — optional guidance rendered on a `help:` line, or `None`.
 
 `render_error(error, source=...) -> str` renders a diagnostic with `file:line`,
-a source excerpt, and a caret indicator. It is what the CLI prints; it never
-includes a raw Python traceback (pass `--debug` to `malt run` to re-raise).
+an error code, a source excerpt, and a caret indicator. It is what the CLI
+prints; it never includes a raw Python traceback (pass `--debug` to `malt run`
+to re-raise). Pass `style="json"` for a machine-readable JSON object (see
+`render_error_json`), and `color=True`/`False` to force or suppress ANSI color.
+
+### Warnings
+
+```python
+from malt.errors import Diagnostic
+```
+
+Non-fatal diagnostics are collected (not raised) during compilation and
+exposed on `unit.warnings`. Each `Diagnostic` has `.severity`, `.code` (e.g.
+`W1001`), `.message`, `.location`, and `.hint`. The compiler currently emits
+warnings for shadowing a builtin function (`W1001`) and shadowing the
+imaginary unit `i`/`j` (`W1002`).
 
 ### CLI
 
 `malt.cli.main(argv: list[str]) -> int` is the entry point; it returns the
 process exit code. The documented commands are `eval`, `run`, `compile`, and
 `repl` (see `malt --help`).
+
+Diagnostic flags shared by `eval`/`run`/`compile`:
+
+- `--color {auto,always,never}` (or `--no-color`) — ANSI color control;
+  `auto` colorizes only when stderr is a TTY and `NO_COLOR` is unset.
+- `--diagnostic-format {text,json}` — human-readable or structured output.
+- `--no-warnings` — suppress non-fatal warnings.
+- `--werror` — treat warnings as errors (non-zero exit).
 
 ## Compiler options / optimization levels
 
@@ -135,6 +160,10 @@ Errors are raised, not returned. The category strings are stable and are what
 Runtime errors are source-located: the executor maps a Python exception raised
 inside generated code back to the original `.m` line via the source map, so a
 user never has to read generated Python to diagnose their MATLAB program.
+
+Error codes are stable (`E1001` lex, `E1002` parse, `E1003` semantic, `E1004`
+codegen, `E2000` runtime, `E2001` index, `E2002` dimension, `E2003` undefined
+variable, `E3000` unsupported); warning codes use a `W` prefix.
 
 ## Compatibility guarantees
 
