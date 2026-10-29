@@ -21,6 +21,11 @@
           enableTk = true;
         };
 
+        # Qt 5 base, for the Qt platform plugins (e.g. ``xcb``) that the
+        # Qt5Agg backend needs at runtime. Nix does not expose this path on
+        # its own, so we set ``QT_QPA_PLATFORM_PLUGIN_PATH`` explicitly below.
+        qtbase = pkgs.libsForQt5.qtbase;
+
         pythonDeps = ps: with ps; [
           numpy
           scipy
@@ -50,6 +55,7 @@
             #!${pkgs.runtimeShell}
             export PYTHONPATH="$out/lib:\''${PYTHONPATH:-}"
             export MPLBACKEND="\''${MPLBACKEND:-Agg}"
+            export QT_QPA_PLATFORM_PLUGIN_PATH="${qtbase.bin}/${qtbase.qtPluginPrefix}/platforms"
             exec ${pythonEnv}/bin/python -m malt "\$@"
             EOF
             chmod +x "$out/bin/malt"
@@ -69,6 +75,8 @@
             # Headless by default so tests never require a display. Override
             # with `export MPLBACKEND=Qt5Agg` for interactive figure windows.
             export MPLBACKEND=''${MPLBACKEND:-Agg}
+            # Qt platform plugins (xcb) for the Qt5Agg backend.
+            export QT_QPA_PLATFORM_PLUGIN_PATH="${qtbase.bin}/${qtbase.qtPluginPrefix}/platforms"
             echo "MALT development shell (nixpkgs ${nixpkgs.lib.version})"
             echo "  python:      $(python --version 2>&1)"
             echo "  run tests:   nix develop -c pytest"

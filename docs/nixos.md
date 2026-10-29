@@ -46,8 +46,11 @@ default headless `Agg` backend this is a silent no-op, so scripts that only
 render to PNG via `saveas`/`exportgraphics` are unaffected.
 
 Qt support is compiled into the Matplotlib override (`enableQt = true`);
-Tk is available too (`enableTk = true`). Which backend works depends on your
-desktop environment. On headless NixOS hosts, use `Agg` and `saveas`/`exportgraphics`.
+Tk is available too (`enableTk = true`). The dev shell also sets
+`QT_QPA_PLATFORM_PLUGIN_PATH` to the store's Qt 5 platform plugins, so the
+`xcb` platform plugin resolves (Qt renders through XWayland on GNOME Wayland).
+Which backend works depends on your desktop environment. On headless NixOS
+hosts, use `Agg` and `saveas`/`exportgraphics`.
 
 ## Building / installing (optional)
 
