@@ -164,6 +164,12 @@ def cmd_debug(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_lsp(args: argparse.Namespace) -> int:
+    from .lsp import run
+
+    return run()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="malt",
@@ -218,6 +224,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_debug.add_argument("--optimization-level", type=int, choices=(0, 1, 2), default=1)
     _add_diagnostic_flags(p_debug)
     p_debug.set_defaults(func=cmd_debug)
+
+    sub.add_parser("lsp", help="run the language server over stdio").set_defaults(
+        func=cmd_lsp
+    )
 
     return parser
 

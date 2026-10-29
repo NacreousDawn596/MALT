@@ -65,6 +65,7 @@ malt compile program.m --source-map program.map   # V3 source map
 malt repl                       # interactive session
 malt debug program.m            # source-level debugger (break/next/print/…)
 malt debug program.m -b 12      # stop at line 12
+malt lsp                        # language server (for VS Code/Neovim/Helix)
 ```
 
 `--optimization-level` selects execution strategy: `0` = 1x1-array scalars
