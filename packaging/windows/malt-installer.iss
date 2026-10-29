@@ -93,10 +93,9 @@ begin
   if P = 0 then
     Exit;
   if P = 1 then
-    Paths := Copy(Paths, Length(Path) + 1, Length(Paths))
+    Paths := Copy(Paths, Length(Path) + 2, Length(Paths))
   else
-    Paths := Copy(Paths, 1, P - 1) + Copy(Paths, P + Length(Path), Length(Paths));
-  Paths := StringChange(Paths, ';;', ';');
+    Paths := Copy(Paths, 1, P - 2) + Copy(Paths, P + Length(Path), Length(Paths));
   if (Paths <> '') and (Paths[Length(Paths)] = ';') then
     Paths := Copy(Paths, 1, Length(Paths) - 1);
   RegWriteStringValue(HKCU, 'Environment', 'Path', Paths);
