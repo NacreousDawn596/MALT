@@ -88,3 +88,25 @@ def test_show_compiles_to_show_call(tmp_path, capsys):
     rc = main(["run", str(f), "--show-generated"])
     assert rc == 0
     assert "_ml.show()" in capsys.readouterr().out
+
+
+def test_run_error_shows_excerpt(tmp_path, capsys):
+    f = tmp_path / "bad.m"
+    f.write_text("A = [1 2];\ndisp(A(5));\n")
+    rc = main(["run", str(f), "--no-color"])
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "[E2001]" in err
+    assert "disp(A(5))" in err
+
+
+def test_run_error_json_format(tmp_path, capsys):
+    import json
+
+    f = tmp_path / "bad.m"
+    f.write_text("disp(undefined_thing);\n")
+    rc = main(["run", str(f), "--diagnostic-format", "json"])
+    assert rc == 1
+    data = json.loads(capsys.readouterr().err)
+    assert data["code"] == "E2003"
+    assert data["location"]["filename"] == str(f)

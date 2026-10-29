@@ -94,7 +94,9 @@ def execute(unit: Any, namespace: dict[str, Any] | None = None) -> dict[str, Any
         raise
     except NameError as e:
         raise UndefinedVariableError(
-            f"undefined variable or function '{_extract_name(e)}'", _locate(unit)
+            f"undefined variable or function '{_extract_name(e)}'", _locate(unit),
+            hint="MALT is case-sensitive; check the spelling or define the "
+            "variable before using it.",
         ) from e
     except Exception as e:
         raise RuntimeError_(str(e), _locate(unit)) from e
