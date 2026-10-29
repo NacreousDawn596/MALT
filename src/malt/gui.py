@@ -1,9 +1,9 @@
-"""A Qt6 GUI REPL for MALT, styled after macOS.
+"""A Qt6 notebook-style GUI REPL for MALT, styled after macOS.
 
-Run with ``malt gui``. Reuses the same evaluation core as the terminal REPL
-(:class:`malt.repl.session.Repl`) and adds an Apple-like window: a frameless
-title bar with traffic lights, a console, an input field, and a live workspace
-sidebar.
+Run with ``malt gui``. Unlike the terminal REPL, this is a Jupyter-like
+*notebook*: every input is an editable cell, you can click back into any
+previous cell to edit it, and re-running a cell replaces its output while
+sharing one persistent workspace.
 
 The Qt6 platform plugins are not exposed by Nix on their own, so the flake
 exports ``MALT_QT6_PLUGIN_PATH``; we forward it to
@@ -22,17 +22,17 @@ if os.environ.get("MALT_QT6_PLUGIN_PATH"):
     os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = os.environ["MALT_QT6_PLUGIN_PATH"]
 
 import numpy as np  # noqa: E402
-from PyQt6.QtCore import QPoint, Qt  # noqa: E402
-from PyQt6.QtGui import QColor, QFont, QKeySequence, QShortcut  # noqa: E402
+from PyQt6.QtCore import QPoint, Qt, pyqtSignal  # noqa: E402
+from PyQt6.QtGui import QKeySequence, QShortcut  # noqa: E402
 from PyQt6.QtWidgets import (  # noqa: E402
     QApplication,
     QFrame,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QMainWindow,
     QPlainTextEdit,
     QPushButton,
+    QScrollArea,
     QSplitter,
     QTreeWidget,
     QTreeWidgetItem,
@@ -40,7 +40,7 @@ from PyQt6.QtWidgets import (  # noqa: E402
     QWidget,
 )
 
-from .repl.session import Repl, _is_incomplete  # noqa: E402
+from .repl.session import Repl  # noqa: E402
 from .runtime.arrays import as_array  # noqa: E402
 
 _TRAFFIC_RED = "#ff5f57"
@@ -65,33 +65,50 @@ QMainWindow, #Content {
     font-weight: 600;
     color: #6e6e73;
 }
-#Console {
+QScrollArea {
+    border: none;
+    background: transparent;
+}
+#Cell {
     background-color: #ffffff;
     border: 1px solid #e4e4e9;
     border-radius: 12px;
-    padding: 10px;
+}
+#CellPrompt {
+    font-family: "SF Mono", "Menlo", "Consolas", monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: #86868b;
+}
+#CellInput {
+    border: none;
+    background: transparent;
+    font-family: "SF Mono", "Menlo", "Consolas", monospace;
+    font-size: 14px;
+    color: #1d1d1f;
+}
+#CellOutput {
+    border: none;
+    background-color: #fafafa;
+    border-radius: 8px;
+    padding: 8px;
     font-family: "SF Mono", "Menlo", "Consolas", monospace;
     font-size: 13px;
     color: #1d1d1f;
 }
-#Input {
-    background-color: #ffffff;
-    border: 1px solid #e4e4e9;
-    border-radius: 10px;
-    padding: 8px 12px;
-    font-family: "SF Mono", "Menlo", "Consolas", monospace;
-    font-size: 14px;
-    color: #1d1d1f;
-}
-#Input:focus {
-    border: 2px solid #0a84ff;
-    padding: 7px 11px;
-}
-#Prompt {
-    font-family: "SF Mono", "Menlo", "Consolas", monospace;
-    font-size: 14px;
-    font-weight: 700;
+#RunButton {
+    border: none;
+    background: transparent;
     color: #0a84ff;
+    font-size: 12px;
+    font-weight: 700;
+}
+#NewCellButton {
+    border: none;
+    background: transparent;
+    color: #86868b;
+    font-size: 15px;
+    font-weight: 600;
 }
 #Workspace {
     background-color: #ffffff;
@@ -132,50 +149,116 @@ def _traffic_button(color: str) -> QPushButton:
     return b
 
 
-class _HistoryLineEdit(QLineEdit):
-    """A single-line editor with Up/Down history navigation."""
+class _CellInput(QPlainTextEdit):
+    """A multi-line editor that emits run signals on notebook shortcuts."""
 
-    def __init__(self) -> None:
-        super().__init__()
-        self._history: list[str] = []
-        self._cursor = 0
-
-    def commit(self, text: str) -> None:
-        if text and (not self._history or self._history[-1] != text):
-            self._history.append(text)
-        self._cursor = len(self._history)
+    run_inplace = pyqtSignal()
+    run_and_next = pyqtSignal()
 
     def keyPressEvent(self, event) -> None:  # noqa: N802
         key = event.key()
-        if key == Qt.Key.Key_Up:
-            if self._history and self._cursor > 0:
-                self._cursor -= 1
-                self.setText(self._history[self._cursor])
-            return
-        if key == Qt.Key.Key_Down:
-            if self._cursor < len(self._history) - 1:
-                self._cursor += 1
-                self.setText(self._history[self._cursor])
-            else:
-                self._cursor = len(self._history)
-                self.clear()
-            return
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            mods = event.modifiers()
+            shift = bool(mods & Qt.KeyboardModifier.ShiftModifier)
+            ctrl = bool(
+                mods
+                & (
+                    Qt.KeyboardModifier.ControlModifier
+                    | Qt.KeyboardModifier.MetaModifier
+                )
+            )
+            if ctrl and not shift:
+                self.run_inplace.emit()
+                return
+            if shift:
+                self.run_and_next.emit()
+                return
         super().keyPressEvent(event)
+
+
+class Cell(QFrame):
+    """One editable input cell with an output area."""
+
+    run_inplace = pyqtSignal(object)
+    run_and_next = pyqtSignal(object)
+
+    def __init__(self, number: int) -> None:
+        super().__init__()
+        self.setObjectName("Cell")
+        self.number = number
+        self._build()
+
+    def _build(self) -> None:
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 10, 14, 12)
+        layout.setSpacing(8)
+
+        header = QHBoxLayout()
+        header.setSpacing(6)
+        self.prompt = QLabel(f"In [{self.number}]:")
+        self.prompt.setObjectName("CellPrompt")
+        run_btn = QPushButton("▶")
+        run_btn.setObjectName("RunButton")
+        run_btn.setFixedSize(24, 20)
+        run_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        run_btn.setToolTip("Run cell (Ctrl+Enter)")
+        run_btn.clicked.connect(lambda: self.run_inplace.emit(self))
+        header.addWidget(self.prompt)
+        header.addStretch(1)
+        header.addWidget(run_btn)
+        layout.addLayout(header)
+
+        self.input = _CellInput()
+        self.input.setObjectName("CellInput")
+        self.input.setPlaceholderText("enter code…  (Ctrl+Enter run, Shift+Enter run + next)")
+        self.input.setMinimumHeight(44)
+        self.input.setMaximumHeight(400)
+        self.input.run_inplace.connect(lambda: self.run_inplace.emit(self))
+        self.input.run_and_next.connect(lambda: self.run_and_next.emit(self))
+        layout.addWidget(self.input)
+
+        self.output = QPlainTextEdit()
+        self.output.setObjectName("CellOutput")
+        self.output.setReadOnly(True)
+        self.output.setMaximumHeight(240)
+        self.output.hide()
+        layout.addWidget(self.output)
+
+    def text(self) -> str:
+        return self.input.toPlainText()
+
+    def set_output(self, text: str, error: bool = False) -> None:
+        self.output.setPlainText(text)
+        if error:
+            self.output.setStyleSheet(
+                "#CellOutput { color: #d70015; background-color: #fafafa; }"
+            )
+        else:
+            self.output.setStyleSheet("")
+        self.output.show()
+
+    def clear_output(self) -> None:
+        self.output.clear()
+        self.output.hide()
+
+    def focus_input(self) -> None:
+        self.input.setFocus()
+        cur = self.input.textCursor()
+        cur.movePosition(cur.MoveOperation.End)
+        self.input.setTextCursor(cur)
 
 
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.repl = Repl()
-        self._buffer = ""
+        self.cells: list[Cell] = []
+        self._counter = 0
         self.setWindowTitle("MALT")
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Window)
-        self.resize(920, 620)
+        self.resize(980, 680)
         self._build_ui()
-        self._append_output("MALT — MATLAB-compatible runtime\n", kind="banner")
-        self._append_output(
-            "Type an expression, or 'help' for commands, 'exit' to quit.\n\n", kind="dim"
-        )
+        self._add_cell()
 
     # -- UI construction ----------------------------------------------------
     def _build_ui(self) -> None:
@@ -195,12 +278,7 @@ class MainWindow(QMainWindow):
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        console = QPlainTextEdit()
-        console.setObjectName("Console")
-        console.setReadOnly(True)
-        console.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
-        self._console = console
-
+        notebook = self._build_notebook()
         workspace = QTreeWidget()
         workspace.setObjectName("Workspace")
         workspace.setHeaderLabels(["Name", "Size", "Class"])
@@ -209,22 +287,35 @@ class MainWindow(QMainWindow):
         workspace.setColumnWidth(1, 90)
         self._workspace = workspace
 
-        splitter.addWidget(console)
+        splitter.addWidget(notebook)
         splitter.addWidget(workspace)
-        splitter.setSizes([620, 260])
+        splitter.setSizes([640, 260])
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 1)
 
         body.addWidget(splitter, 1)
-        body.addWidget(self._build_input_row())
-
         outer.addWidget(content, 1)
+
         self._status = QLabel("ready")
         self._status.setObjectName("StatusBar")
         self._status.setContentsMargins(16, 0, 16, 8)
         outer.addWidget(self._status)
 
-        QShortcut(QKeySequence("Ctrl+L"), self, activated=self._clear_console)
+        QShortcut(QKeySequence("Ctrl+L"), self, activated=self._clear_outputs)
+
+    def _build_notebook(self) -> QScrollArea:
+        self._container = QWidget()
+        self._container.setObjectName("Content")
+        self._layout = QVBoxLayout(self._container)
+        self._layout.setContentsMargins(0, 0, 8, 0)
+        self._layout.setSpacing(12)
+        self._layout.addStretch(1)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(self._container)
+        self._scroll = scroll
+        return scroll
 
     def _build_title_bar(self) -> QWidget:
         bar = QFrame()
@@ -240,7 +331,6 @@ class MainWindow(QMainWindow):
         min_btn.clicked.connect(self.showMinimized)
         zoom_btn = _traffic_button(_TRAFFIC_GREEN)
         zoom_btn.clicked.connect(self._toggle_maximize)
-
         layout.addWidget(close_btn)
         layout.addWidget(min_btn)
         layout.addWidget(zoom_btn)
@@ -251,28 +341,69 @@ class MainWindow(QMainWindow):
         layout.addWidget(title)
         layout.addStretch(1)
 
+        new_btn = QPushButton("＋")
+        new_btn.setObjectName("NewCellButton")
+        new_btn.setFixedSize(28, 24)
+        new_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        new_btn.setToolTip("New cell")
+        new_btn.clicked.connect(self._add_cell)
+        layout.addWidget(new_btn)
+
         self._drag_origin: QPoint | None = None
         bar.mousePressEvent = self._title_mouse_press
         bar.mouseMoveEvent = self._title_mouse_move
         bar.mouseReleaseEvent = self._title_mouse_release
         return bar
 
-    def _build_input_row(self) -> QWidget:
-        row = QWidget()
-        layout = QHBoxLayout(row)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
+    # -- cells --------------------------------------------------------------
+    def _add_cell(self) -> Cell:
+        self._counter += 1
+        cell = Cell(self._counter)
+        cell.run_inplace.connect(self._run_cell_inplace)
+        cell.run_and_next.connect(self._run_cell_and_next)
+        self._layout.insertWidget(self._layout.count() - 1, cell)
+        self.cells.append(cell)
+        cell.focus_input()
+        return cell
 
-        self._prompt = QLabel("»")
-        self._prompt.setObjectName("Prompt")
-        self._input = _HistoryLineEdit()
-        self._input.setObjectName("Input")
-        self._input.setPlaceholderText("enter an expression…")
-        self._input.returnPressed.connect(self._submit)
+    def _run_cell_inplace(self, cell: Cell) -> None:
+        self._execute(cell, move_next=False)
 
-        layout.addWidget(self._prompt)
-        layout.addWidget(self._input, 1)
-        return row
+    def _run_cell_and_next(self, cell: Cell) -> None:
+        self._execute(cell, move_next=True)
+
+    def _execute(self, cell: Cell, move_next: bool) -> None:
+        cell.prompt.setText(f"In [{cell.number}]:")
+        cell.clear_output()
+        text = cell.text().strip()
+        if text:
+            out, err = io.StringIO(), io.StringIO()
+            with redirect_stdout(out), redirect_stderr(err):
+                action = self.repl._handle(text)
+            if out.getvalue():
+                cell.set_output(out.getvalue())
+            if err.getvalue():
+                cell.set_output(err.getvalue(), error=True)
+            self._refresh_workspace()
+            self._status.setText(f"{len(self.repl.namespace)} names in workspace")
+            if action == "quit":
+                self.close()
+                return
+        if move_next:
+            idx = self.cells.index(cell)
+            if idx == len(self.cells) - 1:
+                self._add_cell()
+            else:
+                self.cells[idx + 1].focus_input()
+        self._scroll_to_bottom()
+
+    def _scroll_to_bottom(self) -> None:
+        bar = self._scroll.verticalScrollBar()
+        bar.setValue(bar.maximum())
+
+    def _clear_outputs(self) -> None:
+        for c in self.cells:
+            c.clear_output()
 
     # -- title-bar drag -----------------------------------------------------
     def _title_mouse_press(self, event) -> None:
@@ -292,68 +423,6 @@ class MainWindow(QMainWindow):
             self.showNormal()
         else:
             self.showMaximized()
-
-    # -- console output -----------------------------------------------------
-    def _append_output(self, text: str, kind: str = "normal") -> None:
-        cur = self._console.textCursor()
-        cur.movePosition(cur.MoveOperation.End)
-        fmt = cur.charFormat()
-        if kind == "input":
-            fmt.setForeground(QColor("#0a84ff"))
-            fmt.setFontWeight(QFont.Weight.Bold)
-        elif kind == "error":
-            fmt.setForeground(QColor("#d70015"))
-        elif kind == "banner":
-            fmt.setFontWeight(QFont.Weight.Bold)
-        elif kind == "dim":
-            fmt.setForeground(QColor("#86868b"))
-        else:
-            fmt.setForeground(QColor("#1d1d1f"))
-        cur.setCharFormat(fmt)
-        cur.insertText(text)
-        self._console.setTextCursor(cur)
-        self._console.ensureCursorVisible()
-
-    def _clear_console(self) -> None:
-        self._console.clear()
-
-    # -- input / evaluation -------------------------------------------------
-    def _set_prompt(self, marker: str) -> None:
-        self._prompt.setText(marker)
-
-    def _submit(self) -> None:
-        line = self._input.text()
-        self._input.clear()
-        self._input.commit(line)
-
-        if self._buffer:
-            marker = "…"
-            self._buffer += "\n" + line
-        else:
-            marker = "»"
-            self._buffer = line
-
-        self._append_output(f"{marker} {line}\n", kind="input")
-
-        if _is_incomplete(self._buffer):
-            self._set_prompt("…")
-            return
-
-        source = self._buffer
-        self._buffer = ""
-        self._set_prompt("»")
-
-        out, err = io.StringIO(), io.StringIO()
-        with redirect_stdout(out), redirect_stderr(err):
-            action = self.repl._handle(source)
-        if out.getvalue():
-            self._append_output(out.getvalue())
-        if err.getvalue():
-            self._append_output(err.getvalue(), kind="error")
-        self._refresh_workspace()
-        self._status.setText(f"{len(self.repl.namespace)} names in workspace")
-        if action == "quit":
-            self.close()
 
     # -- workspace sidebar --------------------------------------------------
     def _refresh_workspace(self) -> None:

@@ -98,7 +98,7 @@ malt run program.m               # run a script
 malt compile program.m           # emit generated Python to stdout
 malt debug program.m             # source-level debugger
 malt repl                        # interactive session (terminal)
-malt gui                         # Qt6 GUI REPL (Apple-style)
+malt gui                         # Qt6 notebook GUI (Apple-style, editable cells)
 malt lsp                         # language server (stdio)
 ```
 
