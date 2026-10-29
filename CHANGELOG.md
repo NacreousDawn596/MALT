@@ -3,7 +3,7 @@
 All notable changes to MALT are documented here. This project follows
 `major.minor.patch`; within `0.x`, breaking changes bump the minor version.
 
-## [Unreleased] — developer experience
+## [0.4.0] — 2026-10-29
 
 ### Added
 - **Diagnostics** — stable error codes (`E####`) and warning codes (`W####`),
@@ -23,6 +23,12 @@ All notable changes to MALT are documented here. This project follows
   of builtins and variables, multi-line block input, and `whos`/`clear`.
 - **Language server** — `malt lsp` speaks LSP over stdio (diagnostics, hover,
   completion) with no external dependencies (see `docs/editor-integration.md`).
+- **Qt6 notebook GUI** — `malt gui`, an Apple-style notebook (Jupyter/Colab-
+  like): draggable frameless window, editable and re-runnable cells, syntax
+  highlighting, execution counters, run-all, and insert/move/delete controls.
+- **Packaging** — a Debian `.deb`, a Windows `.exe` installer (PyInstaller +
+  Inno Setup), a portable Linux onedir build, and Nix flake `apps`/GUI
+  launcher/desktop entry (see `docs/installation.md`).
 
 ## [0.3.0] — 2026-10-29
 

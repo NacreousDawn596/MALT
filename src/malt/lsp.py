@@ -20,6 +20,7 @@ import json
 import sys
 from typing import Any
 
+from . import __version__
 from .builtins import BUILTINS
 from .compiler import compile_source
 from .errors import Diagnostic, MaltError
@@ -231,7 +232,7 @@ class LspServer:
                         "hoverProvider": True,
                         "completionProvider": {"triggerCharacters": []},
                     },
-                    "serverInfo": {"name": "malt", "version": "0.3.0"},
+                    "serverInfo": {"name": "malt", "version": __version__},
                 },
             )
         elif method == "initialized":
