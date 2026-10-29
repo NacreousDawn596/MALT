@@ -124,6 +124,10 @@ def cmd_compile(args: argparse.Namespace) -> int:
         if args.explain:
             print(unit.coverage_report(), file=sys.stderr)
         output = unit.show_generated()
+        if args.source_map:
+            with open(args.source_map, "w", encoding="utf-8") as f:
+                f.write(unit.source_map_json())
+            output += f"\n# sourceMappingURL={args.source_map}\n"
         if args.output:
             with open(args.output, "w", encoding="utf-8") as f:
                 f.write(output)
@@ -171,6 +175,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_compile = sub.add_parser("compile", help="emit generated Python")
     p_compile.add_argument("file")
     p_compile.add_argument("-o", "--output", default=None)
+    p_compile.add_argument("--source-map", default=None, metavar="PATH",
+                           help="write a V3 source map to PATH")
     p_compile.add_argument("--explain", action="store_true")
     p_compile.add_argument("--debug", action="store_true")
     p_compile.add_argument("--optimization-level", type=int, choices=(0, 1, 2), default=1)
