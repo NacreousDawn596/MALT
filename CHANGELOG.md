@@ -3,6 +3,13 @@
 All notable changes to MALT are documented here. This project follows
 `major.minor.patch`; within `0.x`, breaking changes bump the minor version.
 
+## [0.4.3] — 2026-10-29
+
+### Fixed
+- Windows installer: fixed a `Type mismatch` in the Inno Setup `[Code]` section
+  (`StringChange` is a procedure, not a function) and corrected an off-by-one in
+  `EnvRemovePath`'s PATH-entry removal arithmetic.
+
 ## [0.4.2] — 2026-10-29
 
 ### Fixed
