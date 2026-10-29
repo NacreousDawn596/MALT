@@ -148,6 +148,22 @@ def cmd_repl(args: argparse.Namespace) -> int:
     return run_repl()
 
 
+def cmd_debug(args: argparse.Namespace) -> int:
+    from .debugger import Debugger
+
+    source = _read_source(args.file)
+    unit = compile_source(
+        source, filename=args.file, optimization_level=args.optimization_level
+    )
+    if _emit_warnings(args, unit):
+        return 1
+    dbg = Debugger(unit)
+    for line in args.break_lines:
+        dbg.breakpoints.add(line)
+    dbg.run()
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="malt",
@@ -186,6 +202,22 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("repl", help="start an interactive session").set_defaults(
         func=cmd_repl
     )
+
+    p_debug = sub.add_parser("debug", help="run under the source-level debugger")
+    p_debug.add_argument("file")
+    p_debug.add_argument(
+        "-b",
+        "--break",
+        dest="break_lines",
+        type=int,
+        action="append",
+        default=[],
+        metavar="LINE",
+        help="set a breakpoint at LINE",
+    )
+    p_debug.add_argument("--optimization-level", type=int, choices=(0, 1, 2), default=1)
+    _add_diagnostic_flags(p_debug)
+    p_debug.set_defaults(func=cmd_debug)
 
     return parser
 
