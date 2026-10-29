@@ -3,7 +3,7 @@
 All notable changes to MALT are documented here. This project follows
 `major.minor.patch`; within `0.x`, breaking changes bump the minor version.
 
-## [0.3.0] — unreleased
+## [0.3.0] — 2026-10-29
 
 ### Added
 - Cell arrays: `{...}` literals, `c{idx}` content access (linear and 2-D
@@ -22,7 +22,10 @@ All notable changes to MALT are documented here. This project follows
 - Cell *slice* access (`c(idx)`) and `cell(n)`/`cell(m,n)` constructors are not
   implemented; struct arrays (`struct('f', {v1, v2})`) are deferred.
 
-## [0.2.0] — unreleased
+## 0.2.0 — unreleased development milestone
+
+> Version 0.2.0 was never tagged or published. The work below shipped in the
+> codebase and is included in the 0.3.0 release.
 
 ### Added
 - `switch`/`case`/`otherwise` and `try`/`catch` with `err.message`/`err.identifier`.
