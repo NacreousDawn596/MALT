@@ -42,7 +42,8 @@ Legend: ✅ implemented and tested · ⚠️ implemented with limitations · ➖
 | Logical arrays | ✅ | |
 | Complex arrays | ✅ | |
 | Empty arrays | ⚠️ | produced by empty colon, limited support |
-| Cell arrays `{}` | ❌ | parsed, not executed |
+| Cell arrays `{}` | ⚠️ | literals, `c{idx}` content access/assign, `iscell`; no `c(idx)` slices, `c{:}`, or `cell(n)` |
+| Structs | ⚠️ | `struct`, dot read/write, `fieldnames`/`isfield`/`isstruct`; no struct arrays |
 
 ## Indexing
 
@@ -71,6 +72,7 @@ Legend: ✅ implemented and tested · ⚠️ implemented with limitations · ➖
 | Local scope | ✅ |
 | Function handles `@name` | ✅ |
 | Anonymous functions `@(x) x.^2` | ✅ |
+| `feval`, `func2str`, `str2func` | ✅ |
 | `nargin`/`nargout`, `varargin`/`varargout` | ❌ |
 | Nested functions | ❌ |
 | Script local functions | ✅ |
@@ -84,7 +86,12 @@ Construction: `zeros ones eye rand randn linspace logspace reshape repmat diag
 meshgrid peaks flipud fliplr rng` — ✅.
 
 Reductions: `sum prod mean min max cumsum cumprod sort size length numel ndims
-isequal` — ✅.
+isequal any all` — ✅.
+
+Type predicates: `isnumeric ischar isempty isscalar isvector ismatrix isrow
+iscolumn isreal isfloat islogical isnan isinf isfinite iscell isstruct` — ✅.
+
+String helpers: `lower upper strcmp strcmpi strcat strjoin strsplit num2str` — ✅.
 
 Linear algebra: `det inv rank trace norm cond eig svd mldivide (\ ) mrdivide (/)
 pinv chol lu qr polyfit` — ✅ (eig/svd/lu/qr support output-count semantics).
@@ -107,6 +114,11 @@ Saving: `saveas exportgraphics` — ✅ (PNG validated in tests).
 `disp fprintf sprintf clc clear` — ✅. `who whos help exit quit` in the REPL — ✅.
 `load save fread fwrite fopen fclose` — ❌.
 
+The REPL also provides readline history (persisted), tab-completion, and
+multi-line block input. A Qt6 GUI REPL is available via `malt gui`.
+A source-level debugger (`malt debug`) and an LSP server (`malt lsp`) are
+documented in `docs/api.md` and `docs/editor-integration.md`.
+
 ## Presentation policy
 
 An unsuppressed assignment or expression in a **script** displays the value
@@ -116,9 +128,10 @@ covered by compatibility test 14.
 
 ## Known limitations
 
-- Cell arrays and structs are unsupported (specifications written; see
-  `docs/specs/`). Field access `.` is supported only on `try/catch` error
-  values (`err.message`, `err.identifier`).
+- Cell arrays support `{...}` literals and `c{idx}` content access/assignment
+  but not parenthesized *slice* access (`c(idx)`), colon content (`c{:}`), or
+  the `cell(n)` constructor. Structs support scalar structs and dot access but
+  not struct arrays. See `docs/specs/cell-arrays.md` and `docs/specs/structs.md`.
 - The execution namespace is not a security sandbox; see the architecture doc.
 - Matrix literals with spaced binary `+` between elements are interpreted as
   unary signs (`[1 +2]` works; `[1 + 2]` is not `[3]`).
