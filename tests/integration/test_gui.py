@@ -117,3 +117,40 @@ def test_gui_move_cell_down(qapp, window):
     window._move_cell(window.cells[0], +1)
     assert window.cells[0].text().strip() == "y = 2;"
     assert window.cells[1].text().strip() == "x = 1;"
+
+
+def test_gui_execution_counter(qapp, window):
+    cell = window.cells[0]
+    cell.input.setPlainText("x = 1;")
+    window._execute(cell, move_next=False)
+    assert cell.exec_number == 1
+    assert cell.prompt.text() == "In [1]:"
+    cell.input.setPlainText("x = 2;")
+    window._execute(cell, move_next=False)
+    assert cell.exec_number == 2
+    assert cell.prompt.text() == "In [2]:"
+
+
+def test_gui_insert_below(qapp, window):
+    window.cells[0].input.setPlainText("x = 1;")
+    window._insert_below(window.cells[0])
+    assert len(window.cells) == 2
+    assert window.cells[1].text().strip() == ""  # new empty cell below
+
+
+def test_gui_insert_above(qapp, window):
+    window.cells[0].input.setPlainText("x = 1;")
+    window._insert_above(window.cells[0])
+    assert len(window.cells) == 2
+    assert window.cells[0].text().strip() == ""  # new empty cell above
+    assert window.cells[1].text().strip() == "x = 1;"
+
+
+def test_highlight_tokenizer():
+    from malt.gui import tokenize_highlight
+
+    spans = tokenize_highlight("for k = 1:10\n  x = sin(k); % comment\nend")
+    kinds = {k for _, _, k in spans}
+    assert "keyword" in kinds
+    assert "number" in kinds
+    assert "comment" in kinds

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import io
 import os
+import re
 import sys
 from contextlib import redirect_stderr, redirect_stdout
 
@@ -23,7 +24,14 @@ if os.environ.get("MALT_QT6_PLUGIN_PATH"):
 
 import numpy as np  # noqa: E402
 from PyQt6.QtCore import QPoint, Qt, pyqtSignal  # noqa: E402
-from PyQt6.QtGui import QKeySequence, QShortcut  # noqa: E402
+from PyQt6.QtGui import (  # noqa: E402
+    QColor,
+    QFont,
+    QKeySequence,
+    QShortcut,
+    QSyntaxHighlighter,
+    QTextCharFormat,
+)
 from PyQt6.QtWidgets import (  # noqa: E402
     QApplication,
     QFrame,
@@ -181,6 +189,51 @@ def _cell_button(text: str, tooltip: str) -> QPushButton:
     return b
 
 
+# ---------------------------------------------------------------------------
+# Syntax highlighting
+# ---------------------------------------------------------------------------
+
+_HIGHLIGHT_COLORS = {
+    "keyword": QColor("#9b2393"),
+    "string": QColor("#c41a16"),
+    "number": QColor("#272ad8"),
+    "comment": QColor("#536579"),
+}
+
+_HIGHLIGHT_RE: list[tuple[str, re.Pattern[str]]] = [
+    ("comment", re.compile(r"%.*")),
+    ("string", re.compile(r"'(?:[^']|'')*'")),
+    ("number", re.compile(r"\b\d+\.?\d*(?:[eE][+-]?\d+)?[ij]?\b")),
+    (
+        "keyword",
+        re.compile(
+            r"\b(?:if|else|elseif|for|while|end|function|switch|case|otherwise|"
+            r"try|catch|break|continue|return|global|parfor)\b"
+        ),
+    ),
+]
+
+
+def tokenize_highlight(text: str) -> list[tuple[int, int, str]]:
+    """Return ``(start, length, kind)`` spans for MATLAB syntax highlighting."""
+    spans: list[tuple[int, int, str]] = []
+    for kind, regex in _HIGHLIGHT_RE:
+        for m in regex.finditer(text):
+            spans.append((m.start(), m.end() - m.start(), kind))
+    spans.sort()
+    return spans
+
+
+class _Highlighter(QSyntaxHighlighter):
+    def highlightBlock(self, text: str) -> None:  # noqa: N802
+        for start, length, kind in tokenize_highlight(text):
+            fmt = QTextCharFormat()
+            fmt.setForeground(_HIGHLIGHT_COLORS[kind])
+            if kind == "keyword":
+                fmt.setFontWeight(QFont.Weight.Bold)
+            self.setFormat(start, length, fmt)
+
+
 class _CellInput(QPlainTextEdit):
     """A multi-line editor that emits run signals on notebook shortcuts."""
 
@@ -216,11 +269,14 @@ class Cell(QFrame):
     delete_requested = pyqtSignal(object)
     move_up_requested = pyqtSignal(object)
     move_down_requested = pyqtSignal(object)
+    insert_above_requested = pyqtSignal(object)
+    insert_below_requested = pyqtSignal(object)
 
     def __init__(self, number: int) -> None:
         super().__init__()
         self.setObjectName("Cell")
         self.number = number
+        self.exec_number: int | None = None
         self._build()
 
     def _build(self) -> None:
@@ -230,11 +286,13 @@ class Cell(QFrame):
 
         header = QHBoxLayout()
         header.setSpacing(4)
-        self.prompt = QLabel(f"In [{self.number}]:")
+        self.prompt = QLabel("In [ ]:")
         self.prompt.setObjectName("CellPrompt")
         header.addWidget(self.prompt)
         header.addStretch(1)
         for text, tip, signal in (
+            ("⤒", "Insert cell above", self.insert_above_requested),
+            ("⤓", "Insert cell below", self.insert_below_requested),
             ("↑", "Move cell up", self.move_up_requested),
             ("↓", "Move cell down", self.move_down_requested),
             ("×", "Delete cell", self.delete_requested),
@@ -255,6 +313,7 @@ class Cell(QFrame):
         self.input.setMaximumHeight(400)
         self.input.run_inplace.connect(lambda: self.run_inplace.emit(self))
         self.input.run_and_next.connect(lambda: self.run_and_next.emit(self))
+        _Highlighter(self.input.document())
         layout.addWidget(self.input)
 
         self.output = QPlainTextEdit()
@@ -263,6 +322,10 @@ class Cell(QFrame):
         self.output.setMaximumHeight(240)
         self.output.hide()
         layout.addWidget(self.output)
+
+    def mark_run(self, n: int) -> None:
+        self.exec_number = n
+        self.prompt.setText(f"In [{n}]:")
 
     def text(self) -> str:
         return self.input.toPlainText()
@@ -294,6 +357,7 @@ class MainWindow(QMainWindow):
         self.repl = Repl()
         self.cells: list[Cell] = []
         self._counter = 0
+        self._exec_count = 0
         self.setWindowTitle("MALT")
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Window)
         self.resize(980, 680)
@@ -406,7 +470,7 @@ class MainWindow(QMainWindow):
         return bar
 
     # -- cells --------------------------------------------------------------
-    def _add_cell(self) -> Cell:
+    def _new_cell(self) -> Cell:
         self._counter += 1
         cell = Cell(self._counter)
         cell.run_inplace.connect(self._run_cell_inplace)
@@ -414,8 +478,27 @@ class MainWindow(QMainWindow):
         cell.delete_requested.connect(self._delete_cell)
         cell.move_up_requested.connect(lambda c, d=-1: self._move_cell(c, d))
         cell.move_down_requested.connect(lambda c, d=+1: self._move_cell(c, d))
+        cell.insert_above_requested.connect(self._insert_above)
+        cell.insert_below_requested.connect(self._insert_below)
+        return cell
+
+    def _add_cell(self) -> Cell:
+        cell = self._new_cell()
         self._layout.insertWidget(self._layout.count() - 1, cell)
         self.cells.append(cell)
+        cell.focus_input()
+        return cell
+
+    def _insert_above(self, cell: Cell) -> None:
+        self._insert_cell_at(self.cells.index(cell))
+
+    def _insert_below(self, cell: Cell) -> None:
+        self._insert_cell_at(self.cells.index(cell) + 1)
+
+    def _insert_cell_at(self, idx: int) -> Cell:
+        cell = self._new_cell()
+        self.cells.insert(idx, cell)
+        self._relayout()
         cell.focus_input()
         return cell
 
@@ -459,12 +542,16 @@ class MainWindow(QMainWindow):
             cell.set_output(err.getvalue(), error=True)
         return action
 
+    def _run_text(self, cell: Cell, text: str) -> str | None:
+        self._exec_count += 1
+        cell.mark_run(self._exec_count)
+        return self._eval_into(cell, text)
+
     def _execute(self, cell: Cell, move_next: bool) -> None:
-        cell.prompt.setText(f"In [{cell.number}]:")
         cell.clear_output()
         text = cell.text().strip()
         if text:
-            action = self._eval_into(cell, text)
+            action = self._run_text(cell, text)
             self._refresh_workspace()
             self._status.setText(f"{len(self.repl.namespace)} names in workspace")
             if action == "quit":
@@ -481,11 +568,10 @@ class MainWindow(QMainWindow):
     def _run_all(self) -> None:
         self.repl.namespace = make_namespace()
         for cell in self.cells:
-            cell.prompt.setText(f"In [{cell.number}]:")
             cell.clear_output()
             text = cell.text().strip()
             if text:
-                if self._eval_into(cell, text) == "quit":
+                if self._run_text(cell, text) == "quit":
                     break
         self._refresh_workspace()
         self._status.setText(f"{len(self.repl.namespace)} names in workspace")
