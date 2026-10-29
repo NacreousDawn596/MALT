@@ -43,6 +43,22 @@ malt lsp           # language server (stdio)
 Uninstall with `sudo apt remove malt`; this removes the package files and
 leaves your home directory untouched.
 
+## Portable Linux (no install)
+
+A self-contained PyInstaller bundle (onedir) is available as a download:
+
+```bash
+chmod +x dist/malt/malt
+./dist/malt/malt --version
+./dist/malt/malt repl
+```
+
+It bundles NumPy, SciPy, Matplotlib, and Qt6, so it does not touch your system
+Python. It is built on a Debian baseline (older glibc) in CI for compatibility
+across distributions; see `docs/installation.md` and `packaging/README.md`.
+No AppImage is currently produced (the required old-glibc baseline image is
+not part of the automated build).
+
 ## NixOS / Nix
 
 MALT is a Nix flake, so NixOS uses the native Nix packaging path (no
