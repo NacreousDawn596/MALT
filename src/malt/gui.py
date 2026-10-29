@@ -27,7 +27,9 @@ from PyQt6.QtCore import QPoint, Qt, pyqtSignal  # noqa: E402
 from PyQt6.QtGui import (  # noqa: E402
     QColor,
     QFont,
+    QIcon,
     QKeySequence,
+    QPixmap,
     QShortcut,
     QSyntaxHighlighter,
     QTextCharFormat,
@@ -187,6 +189,18 @@ def _cell_button(text: str, tooltip: str) -> QPushButton:
     b.setCursor(Qt.CursorShape.PointingHandCursor)
     b.setToolTip(tooltip)
     return b
+
+
+def _find_logo() -> str | None:
+    """Locate ``assets/logo.png`` (CWD or relative to the package)."""
+    candidates = (
+        os.path.join("assets", "logo.png"),
+        os.path.join(os.path.dirname(__file__), "..", "..", "assets", "logo.png"),
+    )
+    for path in candidates:
+        if os.path.isfile(path):
+            return os.path.abspath(path)
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -351,6 +365,39 @@ class Cell(QFrame):
         self.input.setTextCursor(cur)
 
 
+class _TitleBar(QFrame):
+    """A frameless title bar that initiates a native window drag."""
+
+    def __init__(self, window: QMainWindow) -> None:
+        super().__init__()
+        self.setObjectName("TitleBar")
+        self.setFixedHeight(40)
+        self._window = window
+        self._drag_origin: QPoint | None = None
+
+    def mousePressEvent(self, event) -> None:  # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton:
+            handle = self._window.windowHandle()
+            if handle is not None and handle.startSystemMove():
+                return
+            self._drag_origin = event.globalPosition().toPoint()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:  # noqa: N802
+        if self._drag_origin is not None and event.buttons() & Qt.MouseButton.LeftButton:
+            self._window.move(
+                self._window.pos()
+                + event.globalPosition().toPoint()
+                - self._drag_origin
+            )
+            self._drag_origin = event.globalPosition().toPoint()
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:  # noqa: N802
+        self._drag_origin = None
+        super().mouseReleaseEvent(event)
+
+
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -360,6 +407,9 @@ class MainWindow(QMainWindow):
         self._exec_count = 0
         self.setWindowTitle("MALT")
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Window)
+        logo = _find_logo()
+        if logo:
+            self.setWindowIcon(QIcon(logo))
         self.resize(980, 680)
         self._build_ui()
         self._add_cell()
@@ -425,9 +475,7 @@ class MainWindow(QMainWindow):
         return scroll
 
     def _build_title_bar(self) -> QWidget:
-        bar = QFrame()
-        bar.setObjectName("TitleBar")
-        bar.setFixedHeight(40)
+        bar = _TitleBar(self)
         layout = QHBoxLayout(bar)
         layout.setContentsMargins(14, 0, 14, 0)
         layout.setSpacing(8)
@@ -442,6 +490,17 @@ class MainWindow(QMainWindow):
         layout.addWidget(min_btn)
         layout.addWidget(zoom_btn)
         layout.addSpacing(12)
+
+        logo = _find_logo()
+        if logo:
+            icon = QLabel()
+            icon.setPixmap(
+                QPixmap(logo).scaledToHeight(
+                    20, Qt.TransformationMode.SmoothTransformation
+                )
+            )
+            icon.setFixedHeight(20)
+            layout.addWidget(icon)
 
         title = QLabel("MALT")
         title.setObjectName("TitleLabel")
@@ -463,10 +522,6 @@ class MainWindow(QMainWindow):
         new_btn.clicked.connect(self._add_cell)
         layout.addWidget(new_btn)
 
-        self._drag_origin: QPoint | None = None
-        bar.mousePressEvent = self._title_mouse_press
-        bar.mouseMoveEvent = self._title_mouse_move
-        bar.mouseReleaseEvent = self._title_mouse_release
         return bar
 
     # -- cells --------------------------------------------------------------
@@ -586,18 +641,6 @@ class MainWindow(QMainWindow):
             c.clear_output()
 
     # -- title-bar drag -----------------------------------------------------
-    def _title_mouse_press(self, event) -> None:
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._drag_origin = event.globalPosition().toPoint()
-
-    def _title_mouse_move(self, event) -> None:
-        if self._drag_origin is not None and event.buttons() & Qt.MouseButton.LeftButton:
-            self.move(self.pos() + event.globalPosition().toPoint() - self._drag_origin)
-            self._drag_origin = event.globalPosition().toPoint()
-
-    def _title_mouse_release(self, event) -> None:
-        self._drag_origin = None
-
     def _toggle_maximize(self) -> None:
         if self.isMaximized():
             self.showNormal()

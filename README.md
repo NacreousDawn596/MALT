@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/logo.png" alt="MALT logo" width="180">
+
 # 🧮 MALT
 
 ### A MATLAB-compatible language runtime, powered by CPython
@@ -192,9 +194,9 @@ Commands: `break`/`b`, `next`/`n`, `step`/`s`, `continue`/`c`, `print`/`p`,
 
 ### 💬 REPL
 
-A persistent session with readline history (persisted to `~/.malt_history`),
-tab-completion of builtins and variables, multi-line block input, and
-`who`/`whos`/`clear`/`help`:
+A persistent terminal session with readline history (persisted to
+`~/.malt_history`), tab-completion of builtins and variables, multi-line block
+input, and `who`/`whos`/`clear`/`help`:
 
 ```
 >> A = [1 2; 3 4];
@@ -202,6 +204,13 @@ tab-completion of builtins and variables, multi-line block input, and
 ..   disp(k)
 .. end
 ```
+
+### 📓 Notebook GUI
+
+`malt gui` opens an Apple-style Qt6 notebook (a Jupyter/Colab-like desktop
+app): draggable frameless window with traffic lights, editable and re-runnable
+cells, syntax highlighting, execution counters (`In [n]:`), **Run all**, and
+insert / move / delete cell controls — all sharing one live workspace.
 
 ### 🧩 Editor integration
 
