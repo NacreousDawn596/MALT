@@ -40,6 +40,7 @@ from PyQt6.QtWidgets import (  # noqa: E402
     QWidget,
 )
 
+from .executor import make_namespace  # noqa: E402
 from .repl.session import Repl  # noqa: E402
 from .runtime.arrays import as_array  # noqa: E402
 
@@ -103,12 +104,34 @@ QScrollArea {
     font-size: 12px;
     font-weight: 700;
 }
+#CellToolButton {
+    border: none;
+    background: transparent;
+    color: #86868b;
+    font-size: 11px;
+    font-weight: 600;
+}
+#CellToolButton:hover {
+    color: #1d1d1f;
+}
 #NewCellButton {
     border: none;
     background: transparent;
     color: #86868b;
     font-size: 15px;
     font-weight: 600;
+}
+#RunAllButton {
+    border: none;
+    background: transparent;
+    color: #0a84ff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+#RunAllButton:hover {
+    background-color: #eef3fb;
 }
 #Workspace {
     background-color: #ffffff;
@@ -149,6 +172,15 @@ def _traffic_button(color: str) -> QPushButton:
     return b
 
 
+def _cell_button(text: str, tooltip: str) -> QPushButton:
+    b = QPushButton(text)
+    b.setObjectName("CellToolButton")
+    b.setFixedSize(20, 18)
+    b.setCursor(Qt.CursorShape.PointingHandCursor)
+    b.setToolTip(tooltip)
+    return b
+
+
 class _CellInput(QPlainTextEdit):
     """A multi-line editor that emits run signals on notebook shortcuts."""
 
@@ -177,10 +209,13 @@ class _CellInput(QPlainTextEdit):
 
 
 class Cell(QFrame):
-    """One editable input cell with an output area."""
+    """One editable input cell with an output area and a small toolbar."""
 
     run_inplace = pyqtSignal(object)
     run_and_next = pyqtSignal(object)
+    delete_requested = pyqtSignal(object)
+    move_up_requested = pyqtSignal(object)
+    move_down_requested = pyqtSignal(object)
 
     def __init__(self, number: int) -> None:
         super().__init__()
@@ -194,17 +229,22 @@ class Cell(QFrame):
         layout.setSpacing(8)
 
         header = QHBoxLayout()
-        header.setSpacing(6)
+        header.setSpacing(4)
         self.prompt = QLabel(f"In [{self.number}]:")
         self.prompt.setObjectName("CellPrompt")
-        run_btn = QPushButton("▶")
-        run_btn.setObjectName("RunButton")
-        run_btn.setFixedSize(24, 20)
-        run_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        run_btn.setToolTip("Run cell (Ctrl+Enter)")
-        run_btn.clicked.connect(lambda: self.run_inplace.emit(self))
         header.addWidget(self.prompt)
         header.addStretch(1)
+        for text, tip, signal in (
+            ("↑", "Move cell up", self.move_up_requested),
+            ("↓", "Move cell down", self.move_down_requested),
+            ("×", "Delete cell", self.delete_requested),
+        ):
+            btn = _cell_button(text, tip)
+            btn.clicked.connect(lambda _=False, s=signal: s.emit(self))
+            header.addWidget(btn)
+        run_btn = _cell_button("▶", "Run cell (Ctrl+Enter)")
+        run_btn.setObjectName("RunButton")
+        run_btn.clicked.connect(lambda: self.run_inplace.emit(self))
         header.addWidget(run_btn)
         layout.addLayout(header)
 
@@ -314,6 +354,9 @@ class MainWindow(QMainWindow):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setWidget(self._container)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._scroll = scroll
         return scroll
 
@@ -341,6 +384,13 @@ class MainWindow(QMainWindow):
         layout.addWidget(title)
         layout.addStretch(1)
 
+        run_all_btn = QPushButton("▶▶ Run all")
+        run_all_btn.setObjectName("RunAllButton")
+        run_all_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        run_all_btn.setToolTip("Reset the workspace and run every cell")
+        run_all_btn.clicked.connect(self._run_all)
+        layout.addWidget(run_all_btn)
+
         new_btn = QPushButton("＋")
         new_btn.setObjectName("NewCellButton")
         new_btn.setFixedSize(28, 24)
@@ -361,10 +411,37 @@ class MainWindow(QMainWindow):
         cell = Cell(self._counter)
         cell.run_inplace.connect(self._run_cell_inplace)
         cell.run_and_next.connect(self._run_cell_and_next)
+        cell.delete_requested.connect(self._delete_cell)
+        cell.move_up_requested.connect(lambda c, d=-1: self._move_cell(c, d))
+        cell.move_down_requested.connect(lambda c, d=+1: self._move_cell(c, d))
         self._layout.insertWidget(self._layout.count() - 1, cell)
         self.cells.append(cell)
         cell.focus_input()
         return cell
+
+    def _relayout(self) -> None:
+        for c in self.cells:
+            self._layout.removeWidget(c)
+        for c in self.cells:
+            self._layout.insertWidget(self._layout.count() - 1, c)
+
+    def _delete_cell(self, cell: Cell) -> None:
+        if cell not in self.cells:
+            return
+        self.cells.remove(cell)
+        self._layout.removeWidget(cell)
+        cell.deleteLater()
+        if not self.cells:
+            self._add_cell()
+
+    def _move_cell(self, cell: Cell, delta: int) -> None:
+        idx = self.cells.index(cell)
+        new_idx = idx + delta
+        if new_idx < 0 or new_idx >= len(self.cells):
+            return
+        self.cells.pop(idx)
+        self.cells.insert(new_idx, cell)
+        self._relayout()
 
     def _run_cell_inplace(self, cell: Cell) -> None:
         self._execute(cell, move_next=False)
@@ -372,18 +449,22 @@ class MainWindow(QMainWindow):
     def _run_cell_and_next(self, cell: Cell) -> None:
         self._execute(cell, move_next=True)
 
+    def _eval_into(self, cell: Cell, text: str) -> str | None:
+        out, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(out), redirect_stderr(err):
+            action = self.repl._handle(text)
+        if out.getvalue():
+            cell.set_output(out.getvalue())
+        if err.getvalue():
+            cell.set_output(err.getvalue(), error=True)
+        return action
+
     def _execute(self, cell: Cell, move_next: bool) -> None:
         cell.prompt.setText(f"In [{cell.number}]:")
         cell.clear_output()
         text = cell.text().strip()
         if text:
-            out, err = io.StringIO(), io.StringIO()
-            with redirect_stdout(out), redirect_stderr(err):
-                action = self.repl._handle(text)
-            if out.getvalue():
-                cell.set_output(out.getvalue())
-            if err.getvalue():
-                cell.set_output(err.getvalue(), error=True)
+            action = self._eval_into(cell, text)
             self._refresh_workspace()
             self._status.setText(f"{len(self.repl.namespace)} names in workspace")
             if action == "quit":
@@ -395,6 +476,19 @@ class MainWindow(QMainWindow):
                 self._add_cell()
             else:
                 self.cells[idx + 1].focus_input()
+        self._scroll_to_bottom()
+
+    def _run_all(self) -> None:
+        self.repl.namespace = make_namespace()
+        for cell in self.cells:
+            cell.prompt.setText(f"In [{cell.number}]:")
+            cell.clear_output()
+            text = cell.text().strip()
+            if text:
+                if self._eval_into(cell, text) == "quit":
+                    break
+        self._refresh_workspace()
+        self._status.setText(f"{len(self.repl.namespace)} names in workspace")
         self._scroll_to_bottom()
 
     def _scroll_to_bottom(self) -> None:

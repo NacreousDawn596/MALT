@@ -83,3 +83,37 @@ def test_gui_run_and_next_adds_cell(qapp, window):
     window.cells[0].input.setPlainText("z = 1;")
     window._run_cell_and_next(window.cells[0])
     assert len(window.cells) == 2  # a new empty cell was added
+
+
+def test_gui_run_all_resets_and_runs_everything(qapp, window):
+    window.cells[0].input.setPlainText("a = 1;")
+    c1 = window._add_cell()
+    c1.input.setPlainText("b = a + 1;")
+    c2 = window._add_cell()
+    c2.input.setPlainText("c = b * 2;")
+    window._run_all()
+    assert window.repl.namespace["a"] == 1
+    assert float(window.repl.namespace["c"]) == 4.0
+
+
+def test_gui_delete_cell(qapp, window):
+    window.cells[0].input.setPlainText("x = 1;")
+    c1 = window._add_cell()
+    c1.input.setPlainText("y = 2;")
+    window._delete_cell(c1)
+    assert len(window.cells) == 1
+    assert window.cells[0].text().strip() == "x = 1;"
+
+
+def test_gui_delete_last_cell_keeps_one(qapp, window):
+    window._delete_cell(window.cells[0])
+    assert len(window.cells) == 1  # never fewer than one cell
+
+
+def test_gui_move_cell_down(qapp, window):
+    window.cells[0].input.setPlainText("x = 1;")
+    c1 = window._add_cell()
+    c1.input.setPlainText("y = 2;")
+    window._move_cell(window.cells[0], +1)
+    assert window.cells[0].text().strip() == "y = 2;"
+    assert window.cells[1].text().strip() == "x = 1;"
