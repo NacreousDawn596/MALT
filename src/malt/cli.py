@@ -170,6 +170,12 @@ def cmd_lsp(args: argparse.Namespace) -> int:
     return run()
 
 
+def cmd_gui(args: argparse.Namespace) -> int:
+    from .gui import run
+
+    return run()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="malt",
@@ -228,6 +234,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("lsp", help="run the language server over stdio").set_defaults(
         func=cmd_lsp
     )
+
+    sub.add_parser("gui", help="launch the Qt6 GUI REPL").set_defaults(func=cmd_gui)
 
     return parser
 

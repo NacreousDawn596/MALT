@@ -19,6 +19,7 @@ This drops you into a shell with:
 
 - Python 3.13
 - NumPy, SciPy, Matplotlib (built with Qt5 + Tk GUI backends)
+- PyQt6 (for the `malt gui` REPL)
 - pytest, Hypothesis, ruff, mypy, git
 
 The shell sets `MPLBACKEND=Agg` (headless) by default so that tests never
@@ -51,6 +52,19 @@ Tk is available too (`enableTk = true`). The dev shell also sets
 `xcb` platform plugin resolves (Qt renders through XWayland on GNOME Wayland).
 Which backend works depends on your desktop environment. On headless NixOS
 hosts, use `Agg` and `saveas`/`exportgraphics`.
+
+## GUI REPL
+
+The Qt6 GUI is available via `malt gui`:
+
+```bash
+nix develop -c python -m malt gui
+```
+
+Qt6 uses its own, ABI-incompatible platform plugins, so the shell exposes them
+separately as `MALT_QT6_PLUGIN_PATH`; `malt gui` forwards that to
+`QT_QPA_PLATFORM_PLUGIN_PATH` at startup (Qt6 ships both `xcb` and `wayland`
+platform plugins, so it works on X11 and Wayland alike).
 
 ## Building / installing (optional)
 

@@ -26,10 +26,16 @@
         # its own, so we set ``QT_QPA_PLATFORM_PLUGIN_PATH`` explicitly below.
         qtbase = pkgs.libsForQt5.qtbase;
 
+        # Qt 6 base, for the Qt6 GUI REPL (`malt gui`). Kept separate from the
+        # Qt5 plugin path above because the two share ``libqxcb.so`` but are
+        # ABI-incompatible; the GUI sets its own path at startup.
+        qt6base = pkgs.qt6.qtbase;
+
         pythonDeps = ps: with ps; [
           numpy
           scipy
           matplotlibWithGui
+          pyqt6
           pytest
           hypothesis
           ruff
@@ -56,6 +62,7 @@
             export PYTHONPATH="$out/lib:\''${PYTHONPATH:-}"
             export MPLBACKEND="\''${MPLBACKEND:-Agg}"
             export QT_QPA_PLATFORM_PLUGIN_PATH="${qtbase.bin}/${qtbase.qtPluginPrefix}/platforms"
+            export MALT_QT6_PLUGIN_PATH="${qt6base}/${qt6base.qtPluginPrefix}/platforms"
             exec ${pythonEnv}/bin/python -m malt "\$@"
             EOF
             chmod +x "$out/bin/malt"
@@ -77,6 +84,9 @@
             export MPLBACKEND=''${MPLBACKEND:-Agg}
             # Qt platform plugins (xcb) for the Qt5Agg backend.
             export QT_QPA_PLATFORM_PLUGIN_PATH="${qtbase.bin}/${qtbase.qtPluginPrefix}/platforms"
+            # Qt6 platform plugins, for the GUI REPL (`malt gui`), which sets
+            # QT_QPA_PLATFORM_PLUGIN_PATH from this at startup.
+            export MALT_QT6_PLUGIN_PATH="${qt6base}/${qt6base.qtPluginPrefix}/platforms"
             echo "MALT development shell (nixpkgs ${nixpkgs.lib.version})"
             echo "  python:      $(python --version 2>&1)"
             echo "  run tests:   nix develop -c pytest"

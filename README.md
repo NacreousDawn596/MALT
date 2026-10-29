@@ -97,7 +97,8 @@ malt eval "expr"                 # evaluate a MATLAB expression
 malt run program.m               # run a script
 malt compile program.m           # emit generated Python to stdout
 malt debug program.m             # source-level debugger
-malt repl                        # interactive session
+malt repl                        # interactive session (terminal)
+malt gui                         # Qt6 GUI REPL (Apple-style)
 malt lsp                         # language server (stdio)
 ```
 
