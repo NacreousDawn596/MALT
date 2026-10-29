@@ -7,6 +7,10 @@
 #define MyAppName "MALT"
 #define MyAppPublisher "MALT contributors"
 #define MyAppURL "https://github.com/NacreousDawn596/MALT"
+; Paths are relative to this file (packaging\windows), so climb back to the
+; repository root for dist/ and the icons directory.
+#define RepoRoot "..\.."
+#define IconPath "..\icons\malt.ico"
 #ifndef AppVersion
   #define AppVersion "0.4.0"
 #endif
@@ -22,7 +26,7 @@ AppUpdatesURL={#MyAppURL}
 DefaultDirName={localappdata}\Programs\MALT
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
-OutputDir=dist
+OutputDir={#RepoRoot}\dist
 OutputBaseFilename=MALT-Setup-{#AppVersion}-x64
 Compression=lzma2
 SolidCompression=yes
@@ -32,7 +36,7 @@ PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ChangesEnvironment=yes
-SetupIconFile=packaging\icons\malt.ico
+SetupIconFile={#IconPath}
 UninstallDisplayIcon={app}\malt-gui.exe
 
 [Languages]
@@ -42,8 +46,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "addtopath"; Description: "Add MALT to the user PATH"; GroupDescription: "PATH:"
 
 [Files]
-Source: "dist\malt.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "dist\malt-gui.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#RepoRoot}\dist\malt.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#RepoRoot}\dist\malt-gui.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 ; REPL: a console session kept attached to the terminal.
