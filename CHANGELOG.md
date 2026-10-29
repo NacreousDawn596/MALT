@@ -3,6 +3,27 @@
 All notable changes to MALT are documented here. This project follows
 `major.minor.patch`; within `0.x`, breaking changes bump the minor version.
 
+## [Unreleased] — developer experience
+
+### Added
+- **Diagnostics** — stable error codes (`E####`) and warning codes (`W####`),
+  an optional `help:` hint line, ANSI color (`--color`, `--no-color`,
+  `NO_COLOR`/`FORCE_COLOR`), and a structured `--diagnostic-format json`.
+- **Warning channel** — non-fatal `Diagnostic` objects surfaced during
+  compilation: shadowing a builtin (`W1001`) and shadowing the imaginary unit
+  `i`/`j` (`W1002`), with `--no-warnings` and `--werror`.
+- **Source maps** — V3 (base64-VLQ) source maps via `compile --source-map`,
+  mapping generated Python lines back to MATLAB source, plus a
+  `sourceMappingURL` directive.
+- **Source spans** — statements carry end positions, so diagnostics underline
+  the full offending statement rather than a single character.
+- **Debugger** — `malt debug FILE.m` with `break`/`next`/`step`/`continue`/
+  `print`/`list`/`where`/`quit`, operating on MATLAB source via the source map.
+- **REPL** — readline history (persisted to `~/.malt_history`), tab-completion
+  of builtins and variables, multi-line block input, and `whos`/`clear`.
+- **Language server** — `malt lsp` speaks LSP over stdio (diagnostics, hover,
+  completion) with no external dependencies (see `docs/editor-integration.md`).
+
 ## [0.3.0] — 2026-10-29
 
 ### Added

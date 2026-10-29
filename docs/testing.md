@@ -10,8 +10,9 @@ or, within the dev shell, just `pytest`.
 
 ## What is tested
 
-- `tests/unit/` — lexer, parser, codegen, fuzzing.
-- `tests/integration/` — CLI (`eval`, `run`, `compile`, `--version`, errors).
+- `tests/unit/` — lexer, parser, codegen, fuzzing, source maps, REPL, LSP.
+- `tests/integration/` — CLI (`eval`, `run`, `compile`, `debug`, `--version`,
+  errors), debugger.
 - `tests/compatibility/` — the 17 required `.m` fixtures plus Hypothesis
   property tests (arithmetic, transposes, reshape, matmul, seeded RNG, well
   conditioned solves, valid generated Python).
