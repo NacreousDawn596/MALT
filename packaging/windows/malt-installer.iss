@@ -64,8 +64,8 @@ Filename: "{app}\malt.exe"; Parameters: "--version"; \
   Description: "Verify the installation"; Flags: nowait postinstall skipifsilent
 
 [Code]
-{ Append {app} to the user PATH only if it is not already present, and remove
-  exactly that entry on uninstall — never touch unrelated entries. }
+// Append the app dir to the user PATH if absent, and remove exactly that
+// entry on uninstall — never touch unrelated entries.
 procedure EnvAddPath(Path: string);
 var
   Paths: string;
