@@ -17,6 +17,39 @@ class SourceLocation:
         return f"{self.filename}:{self.line}:{self.column}"
 
 
+@dataclass
+class Diagnostic:
+    """A non-fatal diagnostic (warning or note) attached to a source location.
+
+    Unlike :class:`MaltError`, a ``Diagnostic`` is collected rather than
+    raised, so a single compilation can report many of them.
+    """
+
+    severity: str  # "warning" | "note"
+    code: str
+    message: str
+    location: SourceLocation | None = None
+    hint: str | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        loc = self.location
+        return {
+            "severity": self.severity,
+            "code": self.code,
+            "message": self.message,
+            "location": (
+                {
+                    "filename": loc.filename,
+                    "line": loc.line,
+                    "column": loc.column,
+                }
+                if loc is not None
+                else None
+            ),
+            "hint": self.hint,
+        }
+
+
 class MaltError(Exception):
     """Base class for all MALT-reported errors.
 

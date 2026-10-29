@@ -110,3 +110,27 @@ def test_run_error_json_format(tmp_path, capsys):
     data = json.loads(capsys.readouterr().err)
     assert data["code"] == "E2003"
     assert data["location"]["filename"] == str(f)
+
+
+def test_run_warning_to_stderr(tmp_path, capsys):
+    f = tmp_path / "warn.m"
+    f.write_text("sin = 5;\ny = 1;\n")
+    rc = main(["run", str(f), "--no-color"])
+    assert rc == 0
+    err = capsys.readouterr().err
+    assert "[W1001]" in err
+
+
+def test_run_no_warnings_silences(tmp_path, capsys):
+    f = tmp_path / "warn.m"
+    f.write_text("sin = 5;\n")
+    rc = main(["run", str(f), "--no-warnings"])
+    assert rc == 0
+    assert capsys.readouterr().err == ""
+
+
+def test_run_werror_fails(tmp_path, capsys):
+    f = tmp_path / "warn.m"
+    f.write_text("sin = 5;\n")
+    rc = main(["run", str(f), "--werror", "--no-color"])
+    assert rc == 1

@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import argparse
 import sys
+from typing import Any
 
 from . import __version__
 from .compiler import compile_source
-from .diagnostics import render_error
+from .diagnostics import render_error, render_warning, render_warnings_json
 from .errors import MaltError
 from .executor import execute
 from .runtime import graphics as _graphics
@@ -48,6 +49,23 @@ def _add_diagnostic_flags(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--diagnostic-format", choices=("text", "json"), default="text"
     )
+    p.add_argument("--no-warnings", action="store_true")
+    p.add_argument("--werror", action="store_true", help="treat warnings as errors")
+
+
+def _emit_warnings(args: argparse.Namespace, unit: Any) -> bool:
+    """Print compilation warnings; return True if ``--werror`` should fail."""
+    warnings = getattr(unit, "warnings", [])
+    if not warnings or getattr(args, "no_warnings", False):
+        return False
+    style = getattr(args, "diagnostic_format", "text")
+    if style == "json":
+        print(render_warnings_json(warnings), file=sys.stderr)
+    else:
+        color = _color_override(args)
+        for w in warnings:
+            print(render_warning(w, source=unit.source, color=color), file=sys.stderr)
+    return bool(getattr(args, "werror", False))
 
 
 def cmd_eval(args: argparse.Namespace) -> int:
@@ -57,6 +75,8 @@ def cmd_eval(args: argparse.Namespace) -> int:
             filename="<eval>",
             optimization_level=args.optimization_level,
         )
+        if _emit_warnings(args, unit):
+            return 1
         if args.show_generated:
             print(unit.show_generated())
             return 0
@@ -75,6 +95,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         unit = compile_source(
             source, filename=args.file, optimization_level=args.optimization_level
         )
+        if _emit_warnings(args, unit):
+            return 1
         if args.explain:
             print(unit.coverage_report())
         if args.show_generated:
@@ -97,6 +119,8 @@ def cmd_compile(args: argparse.Namespace) -> int:
         unit = compile_source(
             source, filename=args.file, optimization_level=args.optimization_level
         )
+        if _emit_warnings(args, unit):
+            return 1
         if args.explain:
             print(unit.coverage_report(), file=sys.stderr)
         output = unit.show_generated()

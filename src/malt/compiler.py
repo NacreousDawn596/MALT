@@ -12,7 +12,7 @@ from .parser import parse
 @lru_cache(maxsize=128)
 def _compile_cached(source: str, filename: str, optimization_level: int) -> CompilationUnit:
     statements = parse(source, filename)
-    semantic.analyze(statements)
+    warnings = semantic.analyze(statements)
     generated, source_map, diagnostics = codegen.generate(
         statements, filename, optimization_level
     )
@@ -30,6 +30,7 @@ def _compile_cached(source: str, filename: str, optimization_level: int) -> Comp
         source_map=source_map,
         optimization_level=optimization_level,
         diagnostics=diagnostics,
+        warnings=warnings,
     )
 
 

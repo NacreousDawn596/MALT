@@ -17,7 +17,7 @@ import json
 import os
 import sys
 
-from .errors import MaltError, SourceLocation
+from .errors import Diagnostic, MaltError, SourceLocation
 
 # ---------------------------------------------------------------------------
 # ANSI color helpers
@@ -153,3 +153,38 @@ def render_error(
 def render_error_json(error: BaseException, source: str | None = None) -> str:
     """Render a MALT error as an indented JSON string."""
     return render_error(error, source, style="json")
+
+
+def render_warning(
+    diag: Diagnostic,
+    source: str | None = None,
+    *,
+    color: bool | None = None,
+) -> str:
+    """Render a single non-fatal diagnostic (warning) to text."""
+    enabled = color_enabled(override=color)
+    parts: list[str] = []
+    if diag.location is not None:
+        loc = _wrap(str(diag.location), "bold", enabled=enabled)
+        sev = _wrap(diag.severity, "yellow", "bold", enabled=enabled)
+        code = _wrap(f"[{diag.code}]", "cyan", enabled=enabled)
+        parts.append(f"{loc}: {sev} {code}: {diag.message}")
+    else:
+        sev = _wrap(diag.severity, "yellow", "bold", enabled=enabled)
+        code = _wrap(f"[{diag.code}]", "cyan", enabled=enabled)
+        parts.append(f"{sev} {code}: {diag.message}")
+    if diag.location is not None and source is not None:
+        excerpt, caret = source_excerpt(source, diag.location)
+        if excerpt is not None and caret is not None:
+            parts.append("")
+            parts.append(excerpt)
+            parts.append(_wrap(caret, "yellow", enabled=enabled))
+    if diag.hint is not None:
+        label = _wrap("help", "cyan", "bold", enabled=enabled)
+        parts.append(f"{label}: {diag.hint}")
+    return "\n".join(parts)
+
+
+def render_warnings_json(diags: list[Diagnostic]) -> str:
+    """Render a list of non-fatal diagnostics as an indented JSON array."""
+    return json.dumps([d.to_dict() for d in diags], indent=2)
