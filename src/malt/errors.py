@@ -7,11 +7,18 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class SourceLocation:
-    """A position within a source file."""
+    """A position (optionally a span) within a source file.
+
+    ``line``/``column`` are 1-based. ``end_line``/``end_column`` are optional
+    and describe the inclusive end of a span; ``end_column`` is exclusive
+    (one past the last character), so the span width is ``end_column - column``.
+    """
 
     filename: str
     line: int
     column: int
+    end_line: int | None = None
+    end_column: int | None = None
 
     def __str__(self) -> str:
         return f"{self.filename}:{self.line}:{self.column}"

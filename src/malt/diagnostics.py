@@ -79,7 +79,15 @@ def source_excerpt(
     gutter = " " * (len(line_no) + 2)
     excerpt = f"{line_no} | {text}"
     col = max(0, location.column - 1)
-    caret = f"{gutter}| {' ' * col}{'^' * max(1, caret_span)}"
+    if (
+        location.end_line == location.line
+        and location.end_column is not None
+        and location.end_column > location.column
+    ):
+        width = location.end_column - location.column
+    else:
+        width = max(1, caret_span)
+    caret = f"{gutter}| {' ' * col}{'^' * width}"
     return excerpt, caret
 
 

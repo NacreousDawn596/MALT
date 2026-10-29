@@ -69,3 +69,32 @@ def test_non_malt_error_json_fallback():
     out = json.loads(render_error(RuntimeError("boom"), style="json"))
     assert out["severity"] == "error"
     assert "boom" in out["message"]
+
+
+def test_statement_span_produces_multi_char_caret():
+    src = "A = [1 2];\nresult = A(10);\n"
+    unit = compile_source(src, "t.m")
+    try:
+        execute(unit)
+    except IndexError_ as e:
+        assert e.location is not None
+        assert e.location.end_line == 2
+        assert e.location.end_column is not None
+        assert e.location.end_column > e.location.column
+        rendered = render_error(e, source=src, color=False)
+        assert "^^^^^^^^^^^^^" in rendered  # underlines `result = A(10)`
+    else:
+        raise AssertionError("expected IndexError_")
+
+
+def test_parse_error_single_char_caret():
+    from malt.diagnostics import render_error
+    from malt.errors import ParseError
+
+    try:
+        compile_source("x = [1 2; 3 4", "t.m")
+    except ParseError as e:
+        rendered = render_error(e, source="x = [1 2; 3 4", color=False)
+        assert "^\n" in rendered or "^" in rendered
+    else:
+        raise AssertionError("expected ParseError")

@@ -84,6 +84,20 @@ class Parser:
             raise ParseError(message, t.location)
         raise ParseError(message, t)
 
+    def _with_span(self, node: ast.Statement) -> ast.Statement:
+        """Attach an end position to ``node`` spanning the just-parsed text."""
+        last = self.tokens[self.index - 1] if self.index > 0 else self.peek()
+        end = last.end_location
+        loc = node.location
+        node.location = SourceLocation(
+            loc.filename,
+            loc.line,
+            loc.column,
+            end_line=end.line,
+            end_column=end.column,
+        )
+        return node
+
     # -- newline handling ---------------------------------------------------
     def skip_newlines(self) -> None:
         while self.peek().type == TokenType.NEWLINE:
@@ -97,6 +111,7 @@ class Parser:
             if self.at_end():
                 break
             stmt = self.parse_statement()
+            self._with_span(stmt)
             statements.append(stmt)
             # terminators
             if self.match(TokenType.SEMICOLON):

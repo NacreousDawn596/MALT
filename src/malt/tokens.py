@@ -87,3 +87,20 @@ class Token:
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"Token({self.type.name}, {self.value!r})"
+
+    @property
+    def end_location(self) -> SourceLocation:
+        """The inclusive end position of this token (from its raw text)."""
+        loc = self.location
+        parts = self.raw.split("\n")
+        if len(parts) == 1:
+            return SourceLocation(
+                loc.filename,
+                loc.line,
+                loc.column + len(self.raw),
+                loc.line,
+                loc.column + len(self.raw),
+            )
+        end_line = loc.line + len(parts) - 1
+        end_col = loc.column + len(parts[-1])
+        return SourceLocation(loc.filename, end_line, end_col, end_line, end_col)
