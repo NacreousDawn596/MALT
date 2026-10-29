@@ -75,6 +75,42 @@ jobs:
             dist/malt-gui.exe
             dist/MALT-Setup-*-x64.exe
 
+  linux-portable:
+    name: Portable Linux (onedir, amd64)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build portable bundles
+        run: bash scripts/build-linux-portable.sh
+
+      - name: Smoke-test the CLI bundle
+        run: |
+          ./dist/malt/malt --version
+          ./dist/malt/malt eval "2 + 3 * 4" | grep -q "14"
+          printf 'exit\n' | ./dist/malt/malt repl
+
+      - name: Smoke-test headless graphics
+        run: |
+          cat > smoke.m <<'EOF'
+          x = 0:0.1:6;
+          plot(x, sin(x));
+          saveas(gcf, 'smoke.png');
+          EOF
+          MPLBACKEND=Agg ./dist/malt/malt run smoke.m
+          test -f smoke.png
+
+      - name: Upload portable Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: malt-linux-portable-amd64
+          path: |
+            dist/malt/
+            dist/malt-gui/
+
   nix:
     name: Nix package
     runs-on: ubuntu-latest

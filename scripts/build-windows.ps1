@@ -29,13 +29,13 @@ Write-Host "==> building CLI executable (malt.exe)"
 python -m PyInstaller --noconfirm --clean --onefile --name malt `
     --collect-all numpy --collect-all scipy --collect-all matplotlib `
     --collect-all PyQt6 --icon packaging\icons\malt.ico `
-    packaging\windows\malt_cli.py
+    packaging\entrypoints\malt_cli.py
 
 Write-Host "==> building GUI executable (malt-gui.exe)"
 python -m PyInstaller --noconfirm --clean --onefile --windowed --name malt-gui `
     --collect-all numpy --collect-all scipy --collect-all matplotlib `
     --collect-all PyQt6 --icon packaging\icons\malt.ico `
-    packaging\windows\malt_gui.py
+    packaging\entrypoints\malt_gui.py
 
 if (-not (Test-Path "dist\malt.exe")) { throw "malt.exe was not produced" }
 if (-not (Test-Path "dist\malt-gui.exe")) { throw "malt-gui.exe was not produced" }

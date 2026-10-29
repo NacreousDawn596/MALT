@@ -55,6 +55,18 @@ nix run .#default -- --version
 nix flake check
 ```
 
+## Linux: portable onedir (PyInstaller)
+
+```bash
+scripts/build-linux-portable.sh
+# -> dist/malt/malt, dist/malt-gui/malt-gui
+```
+
+Build on a Debian/Ubuntu system (the CI uses `ubuntu-22.04` for a wide glibc
+compatibility baseline). Do **not** build on NixOS — numpy/scipy carry Nix
+store RPATHs there, so the result would not be portable. NixOS users use the
+flake.
+
 ## Windows
 
 Build on a Windows x64 runner (PyInstaller cannot cross-compile from Linux):
