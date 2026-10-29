@@ -115,16 +115,23 @@ imaginary unit `i`/`j` (`W1002`).
 ### CLI
 
 `malt.cli.main(argv: list[str]) -> int` is the entry point; it returns the
-process exit code. The documented commands are `eval`, `run`, `compile`, and
-`repl` (see `malt --help`).
+process exit code. The documented commands are `eval`, `run`, `compile`,
+`debug`, and `repl` (see `malt --help`).
 
-Diagnostic flags shared by `eval`/`run`/`compile`:
+Diagnostic flags shared by `eval`/`run`/`compile`/`debug`:
 
 - `--color {auto,always,never}` (or `--no-color`) — ANSI color control;
   `auto` colorizes only when stderr is a TTY and `NO_COLOR` is unset.
 - `--diagnostic-format {text,json}` — human-readable or structured output.
 - `--no-warnings` — suppress non-fatal warnings.
 - `--werror` — treat warnings as errors (non-zero exit).
+
+`malt compile` additionally supports `--source-map PATH`, which writes a V3
+source map (base64-VLQ) mapping generated Python lines back to the MATLAB
+source, and appends a `# sourceMappingURL=` comment to the generated output.
+
+`malt debug FILE.m` runs under the source-level debugger (see
+`malt.debugger.Debugger`); `-b/--break LINE` sets an initial breakpoint.
 
 ## Compiler options / optimization levels
 

@@ -61,7 +61,10 @@ malt run program.m --show-generated
 malt run program.m --optimization-level 0|1|2
 malt compile program.m          # emit generated Python to stdout
 malt compile program.m -o out.py
+malt compile program.m --source-map program.map   # V3 source map
 malt repl                       # interactive session
+malt debug program.m            # source-level debugger (break/next/print/…)
+malt debug program.m -b 12      # stop at line 12
 ```
 
 `--optimization-level` selects execution strategy: `0` = 1x1-array scalars
