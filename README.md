@@ -12,7 +12,7 @@ parsed, and compiled to Python **in memory**, then executed on
 
 <br>
 
-![version](https://img.shields.io/badge/version-0.4.1-2ea44f?style=for-the-badge&logo=semver)
+![version](https://img.shields.io/badge/version-0.4.2-2ea44f?style=for-the-badge&logo=semver)
 ![python](https://img.shields.io/badge/python-3.11%2B-3776ab?style=for-the-badge&logo=python&logoColor=white)
 ![license](https://img.shields.io/badge/license-MIT-3da639?style=for-the-badge&logo=open-source-initiative&logoColor=white)
 ![nixos](https://img.shields.io/badge/reproducible-NixOS-5277c3?style=for-the-badge&logo=nixos&logoColor=white)

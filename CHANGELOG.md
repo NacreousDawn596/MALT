@@ -3,6 +3,14 @@
 All notable changes to MALT are documented here. This project follows
 `major.minor.patch`; within `0.x`, breaking changes bump the minor version.
 
+## [0.4.2] — 2026-10-29
+
+### Fixed
+- Windows installer: fixed a Pascal comment in the Inno Setup `[Code]` section
+  that broke compilation (the `{app}` reference closed the block comment early).
+- Release workflow now publishes a GitHub Release with the built artifacts on
+  tag push (`.deb`, Windows installer, portable Linux tarball).
+
 ## [0.4.1] — 2026-10-29
 
 ### Fixed

@@ -20,7 +20,7 @@ have not been verified for it.
 Download `malt_<version>_amd64.deb` and install it:
 
 ```bash
-sudo apt install ./malt_0.4.1_amd64.deb
+sudo apt install ./malt_0.4.2_amd64.deb
 ```
 
 This installs the source under `/opt/malt` and a `malt` launcher under

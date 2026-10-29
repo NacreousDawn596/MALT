@@ -1,3 +1,3 @@
 """MALT — a MATLAB-compatible language runtime powered by CPython."""
 
-__version__ = "0.4.1"
+__version__ = "0.4.2"
