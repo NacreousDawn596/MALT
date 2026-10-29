@@ -3,6 +3,13 @@
 All notable changes to MALT are documented here. This project follows
 `major.minor.patch`; within `0.x`, breaking changes bump the minor version.
 
+## [0.4.1] — 2026-10-29
+
+### Fixed
+- Packaging build fixes: PyInstaller now discovers the `malt` package via
+  `--paths src`, and the Windows Inno Setup script resolves its `dist/` and
+  icon paths relative to the script (not the repository root).
+
 ## [0.4.0] — 2026-10-29
 
 ### Added
