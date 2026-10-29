@@ -1,0 +1,95 @@
+name: Release
+
+# Artifact builds are separate from ordinary test CI and are gated to manual
+# dispatch or a version tag. No GitHub release is published automatically.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  debian:
+    name: Debian package (amd64)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build .deb
+        run: bash scripts/build-deb.sh --arch amd64
+
+      - name: Smoke-test the .deb (install, run, uninstall)
+        run: bash scripts/test-package.sh "$(ls malt_*_amd64.deb)"
+
+      - name: Upload .deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: malt-debian-amd64
+          path: malt_*_amd64.deb
+
+  windows:
+    name: Windows installer (x64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Inno Setup
+        run: |
+          choco install innosetup --no-progress -y
+
+      - name: Build executables + installer
+        shell: pwsh
+        run: ./scripts/build-windows.ps1
+
+      - name: Smoke-test the CLI (malt.exe)
+        shell: pwsh
+        run: |
+          & .\dist\malt.exe --version
+          $r = & .\dist\malt.exe eval "2 + 3 * 4"
+          if ($r -notmatch "14") { throw "eval smoke test failed" }
+          & .\dist\malt.exe --help | Out-Null
+
+      - name: Smoke-test the REPL (malt.exe repl)
+        shell: pwsh
+        run: |
+          "exit" | & .\dist\malt.exe repl
+
+      - name: Smoke-test headless graphics
+        shell: pwsh
+        run: |
+          Set-Content -Path smoke.m -Value "x = 0:0.1:6;`nplot(x, sin(x));`nsaveas(gcf, 'smoke.png');"
+          $env:MPLBACKEND = "Agg"
+          & .\dist\malt.exe run smoke.m
+          if (-not (Test-Path smoke.png)) { throw "graphics export failed" }
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: malt-windows-x64
+          path: |
+            dist/malt.exe
+            dist/malt-gui.exe
+            dist/MALT-Setup-*-x64.exe
+
+  nix:
+    name: Nix package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Nix flake check
+        run: nix flake check
+
+      - name: Build the package
+        run: nix build .#default
+
+      - name: Smoke-test the built store path
+        run: |
+          ./result/bin/malt --version
+          ./result/bin/malt eval "2 + 3 * 4" | grep -q "14"

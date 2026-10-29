@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# MALT launcher — installed by the Debian package to /usr/bin/malt.
+# Keeps the bundled source (under /opt/malt/lib) on PYTHONPATH and delegates
+# to the system Python interpreter. Never mutates the user's environment.
+set -euo pipefail
+PYTHONPATH="/opt/malt/lib${PYTHONPATH:+:${PYTHONPATH}}" exec python3 -m malt "$@"

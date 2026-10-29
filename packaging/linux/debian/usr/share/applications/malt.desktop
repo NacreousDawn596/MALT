@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=MALT
+Comment=Interactive notebook REPL for the MALT language
+Exec=malt-gui
+Icon=malt
+Terminal=false
+Categories=Development;Science;Math;

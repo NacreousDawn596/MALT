@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# MALT GUI launcher — installed by the Debian package to /usr/bin/malt-gui.
+set -euo pipefail
+exec /usr/bin/malt gui "$@"

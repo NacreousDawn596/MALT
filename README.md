@@ -68,7 +68,7 @@ nix develop -c python -m malt --help
 nix develop -c python -m malt eval "1 + 2 * 3"
 nix develop -c python -m malt run examples/graphics/sine_plot.m
 nix develop -c python -m malt repl
-nix develop -c pytest                          # full test suite (547 tests)
+nix develop -c pytest                          # full test suite
 ```
 
 ### pip (needs NumPy / SciPy / Matplotlib)
@@ -77,6 +77,9 @@ nix develop -c pytest                          # full test suite (547 tests)
 pip install .                                  # or: python -m pip install -e .
 python -m malt --help
 ```
+
+> For distributed builds — a Debian `.deb`, a Windows `.exe` installer, or a
+> Nix profile install — see [docs/installation.md](docs/installation.md).
 
 ### Interactive figures
 
@@ -236,6 +239,7 @@ map mapping generated Python back to MATLAB source, plus a
 | [`docs/api.md`](docs/api.md) | Python API, compiler options, error model |
 | [`docs/architecture.md`](docs/architecture.md) | pipeline, runtime, security model |
 | [`docs/nixos.md`](docs/nixos.md) | reproducible environment + graphics |
+| [`docs/installation.md`](docs/installation.md) | distributed builds (`.deb`, Windows, Nix) |
 | [`docs/testing.md`](docs/testing.md) | test strategy + differential testing |
 | [`docs/editor-integration.md`](docs/editor-integration.md) | LSP setup for editors |
 | [`docs/specs/`](docs/specs/) | feature specs: try/catch, cell arrays, structs |

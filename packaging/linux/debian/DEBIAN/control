@@ -1,0 +1,16 @@
+Package: malt
+Version: @VERSION@
+Section: science
+Priority: optional
+Architecture: @ARCH@
+Maintainer: MALT contributors <kamal@aferiad.xyz>
+Homepage: https://github.com/NacreousDawn596/MALT
+Depends: python3 (>= 3.11), python3-numpy, python3-scipy, python3-matplotlib
+Recommends: python3-pyqt6
+Description: A MATLAB-compatible language runtime powered by CPython
+ MALT is a standalone language implementation for a documented MATLAB subset.
+ It parses, semantically analyzes, and compiles MATLAB-like source to Python
+ in memory, then executes it on NumPy, SciPy, and Matplotlib.
+ .
+ It provides a CLI, an interactive REPL, a source-level debugger, a language
+ server (LSP), structured diagnostics with source maps, and a Qt6 notebook GUI.

@@ -16,6 +16,12 @@ htmlcov/
 result
 result-*
 
+# Packaging artifacts (never committed)
+*.deb
+*.rpm
+*.exe
+*.msi
+
 # Test artifacts (must never leak into the repo root)
 test_plot.png
 *.png
