@@ -32,12 +32,12 @@ echo "==> building portable Linux dist (version $VERSION)"
 rm -rf dist build
 
 echo "==> CLI bundle (onedir)"
-pyinstaller --noconfirm --clean --name malt \
+pyinstaller --noconfirm --clean --name malt --paths src \
   --collect-all numpy --collect-all scipy --collect-all matplotlib \
   --collect-all PyQt6 packaging/entrypoints/malt_cli.py
 
 echo "==> GUI bundle (onedir)"
-pyinstaller --noconfirm --clean --windowed --name malt-gui \
+pyinstaller --noconfirm --clean --windowed --name malt-gui --paths src \
   --collect-all numpy --collect-all scipy --collect-all matplotlib \
   --collect-all PyQt6 packaging/entrypoints/malt_gui.py
 

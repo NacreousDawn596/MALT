@@ -26,13 +26,13 @@ python -m pip install --upgrade pip setuptools wheel
 python -m pip install numpy scipy matplotlib pyqt6 pyinstaller
 
 Write-Host "==> building CLI executable (malt.exe)"
-python -m PyInstaller --noconfirm --clean --onefile --name malt `
+python -m PyInstaller --noconfirm --clean --onefile --name malt --paths src `
     --collect-all numpy --collect-all scipy --collect-all matplotlib `
     --collect-all PyQt6 --icon packaging\icons\malt.ico `
     packaging\entrypoints\malt_cli.py
 
 Write-Host "==> building GUI executable (malt-gui.exe)"
-python -m PyInstaller --noconfirm --clean --onefile --windowed --name malt-gui `
+python -m PyInstaller --noconfirm --clean --onefile --windowed --name malt-gui --paths src `
     --collect-all numpy --collect-all scipy --collect-all matplotlib `
     --collect-all PyQt6 --icon packaging\icons\malt.ico `
     packaging\entrypoints\malt_gui.py
