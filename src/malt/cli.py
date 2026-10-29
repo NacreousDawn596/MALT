@@ -249,5 +249,19 @@ def main(argv: list[str] | None = None) -> int:
     return args.func(args)
 
 
+def repl_main() -> int:
+    """Entry point for a standalone REPL launcher (``malt-repl``)."""
+    from .repl.session import run_repl
+
+    return run_repl()
+
+
+def gui_main() -> int:
+    """Entry point for a standalone GUI launcher (``malt-gui``)."""
+    from .gui import run
+
+    return run()
+
+
 if __name__ == "__main__":
     raise SystemExit(main())

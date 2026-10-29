@@ -18,6 +18,8 @@ dependencies = [
 
 [project.scripts]
 malt = "malt.cli:main"
+malt-repl = "malt.cli:repl_main"
+malt-gui = "malt.cli:gui_main"
 
 [project.optional-dependencies]
 dev = [
