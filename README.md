@@ -83,8 +83,11 @@ python -m malt --help
 
 ### Interactive figures
 
-The default backend is headless `Agg` (safe for tests and CI). To open real
-figure windows, select a GUI backend and provide a display server:
+By default, development/CI runs use headless `Agg` (safe for tests and CI).
+Packaged Windows executables default to `Qt5Agg` so `malt run` can open figure
+windows without extra configuration. You can still override with `MPLBACKEND`.
+On Linux/Nix, to open real figure windows, select a GUI backend and provide a
+display server:
 
 ```bash
 MPLBACKEND=Qt5Agg nix develop -c python -m malt run examples/graphics/sine_plot.m

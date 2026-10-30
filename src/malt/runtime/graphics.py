@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import os
+import sys
 from typing import Any
 
 import matplotlib
 
-_backend = os.environ.get("MPLBACKEND", "Agg")
+if "MPLBACKEND" in os.environ:
+    _backend = os.environ["MPLBACKEND"]
+elif sys.platform == "win32" and getattr(sys, "frozen", False):
+    _backend = "Qt5Agg"
+else:
+    _backend = "Agg"
+
 matplotlib.use(_backend)
 import matplotlib.pyplot as plt  # noqa: E402
 
