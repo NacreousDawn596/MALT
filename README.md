@@ -130,7 +130,7 @@ malt lsp                         # language server (stdio)
 x = linspace(0, 2*pi, 200);
 y = sin(x);
 plot(x, y, 'b-', 'LineWidth', 2);
-title('Sine Wave'); xlabel('Time'); ylabel('Amplitude');
+title('Sine Wave'); xlabel('time'); ylabel('amplitude');
 grid on;
 ```
 

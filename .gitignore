@@ -46,3 +46,7 @@ dist/
 .env
 .env.*
 !.env.example
+
+!page/public/
+!page/public/assets/
+!page/public/assets/**
