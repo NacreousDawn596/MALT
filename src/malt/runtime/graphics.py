@@ -10,7 +10,7 @@ import matplotlib
 
 if "MPLBACKEND" in os.environ:
     _backend = os.environ["MPLBACKEND"]
-elif sys.platform == "win32" and getattr(sys, "frozen", False):
+elif sys.platform in {"win32", "linux"}:
     _backend = "Qt5Agg"
 else:
     _backend = "Agg"

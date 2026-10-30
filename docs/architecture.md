@@ -92,8 +92,8 @@ linear indexing), resolved by the code generator from context.
 
 `runtime/graphics.py` wraps Matplotlib with a MATLAB-compatible API and its own
 graphics state (current figure/axes, hold state, last mappable). The backend is
-chosen at import from `MPLBACKEND`; when unset, it defaults to `Agg` except in
-frozen Windows builds where it defaults to `Qt5Agg`. The test suite inspects
+chosen at import from `MPLBACKEND`; when unset, it defaults to `Qt5Agg` on
+Linux and Windows, and `Agg` elsewhere. The test suite inspects
 real Matplotlib artists, not printed output.
 
 ## Correctness invariants

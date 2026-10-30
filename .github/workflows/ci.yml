@@ -18,7 +18,7 @@ jobs:
         uses: DeterminateSystems/magic-nix-cache-action@main
 
       - name: Full test suite (incl. Octave differential, hard-required)
-        run: MALT_REQUIRE_OCTAVE=1 nix develop -c pytest -q
+        run: MPLBACKEND=Agg MALT_REQUIRE_OCTAVE=1 nix develop -c pytest -q
 
       - name: Lint
         run: nix develop -c ruff check .

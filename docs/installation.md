@@ -20,7 +20,7 @@ have not been verified for it.
 Download `malt_<version>_amd64.deb` and install it:
 
 ```bash
-sudo apt install ./malt_0.4.3_amd64.deb
+sudo apt install ./malt_0.4.4_amd64.deb
 ```
 
 This installs the source under `/opt/malt` and a `malt` launcher under
@@ -94,8 +94,8 @@ The installer creates two Start Menu shortcuts:
 - **MALT GUI** — launches the Qt6 notebook without a console window.
 
 The packaged executables bundle Python plus NumPy, SciPy, Matplotlib, PyQt5,
-and PyQt6. On packaged Windows builds, plotting defaults to Matplotlib's
-`Qt5Agg` backend unless `MPLBACKEND` is explicitly set.
+and PyQt6. On Linux and Windows, plotting defaults to Matplotlib's `Qt5Agg`
+backend unless `MPLBACKEND` is explicitly set.
 
 It offers a task to add MALT to your **user** `PATH`. After a fresh install,
 open a **new** Command Prompt or PowerShell session so the updated `PATH`

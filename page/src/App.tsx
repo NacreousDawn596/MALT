@@ -155,13 +155,13 @@ function Installation() {
   const tabs=[{id:'nix',label:'Nix / NixOS'},{id:'debian',label:'Debian / Ubuntu'},{id:'windows',label:'Windows'},{id:'portable',label:'Portable Linux'}];
   const commands:Record<string,string>={
     nix:'nix run github:NacreousDawn596/MALT -- --version\n\nnix profile install github:NacreousDawn596/MALT\nmalt --version',
-    debian:'sudo apt install ./malt_0.4.3_amd64.deb\nmalt --version\nmalt repl',
+    debian:'sudo apt install ./malt_0.4.4_amd64.deb\nmalt --version\nmalt repl',
     windows:'malt --version\nmalt eval "2 + 2"\nmalt repl\nmalt gui',
     portable:'tar -xzf malt-linux-portable-amd64.tar.gz\n./dist/malt/malt --version\n./dist/malt/malt repl',
   };
   const details:Record<string,{title:string;body:string;label:string;meta:string}>={
     nix:{title:'Native, reproducible by design.',body:'MALT is packaged as a Nix flake. Run it directly, install it into your profile, or add the package to a NixOS system configuration. No PyInstaller bundle, no mutable application files in the store.',label:'RUN WITH NIX',meta:'x86_64-linux · native flake'},
-    debian:{title:'A familiar package-manager install.',body:'The Debian package installs MALT under /opt and exposes the malt command. NumPy, SciPy, and Matplotlib are provided by the distribution packages; Qt6 is an optional GUI recommendation.',label:'DEBIAN / UBUNTU',meta:'amd64 · Debian 12 / Ubuntu 24.04+'},
+    debian:{title:'A familiar package-manager install.',body:'The Debian package installs MALT under /opt and exposes the malt command. NumPy, SciPy, and Matplotlib are provided by the distribution packages; plotting defaults to Qt5Agg unless MPLBACKEND is set (for example, Agg on headless hosts).',label:'DEBIAN / UBUNTU',meta:'amd64 · Debian 12 / Ubuntu 24.04+'},
     windows:{title:'Two ways into the same toolchain.',body:'The Windows installer creates separate Start Menu shortcuts for the terminal REPL and the Qt6 notebook GUI. It can add the CLI to your user PATH for use from a new PowerShell or Command Prompt.',label:'WINDOWS INSTALLER',meta:'x64 · per-user installation'},
     portable:{title:'A portable Linux bundle.',body:'The onedir distribution carries the Python runtime and numerical / graphics dependencies. It is built on a Debian baseline; compatibility still depends on the host Linux shared-library baseline.',label:'PORTABLE ARCHIVE',meta:'amd64 · PyInstaller onedir'},
   };
