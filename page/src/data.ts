@@ -1,7 +1,7 @@
 export const REPO = 'https://github.com/NacreousDawn596/MALT';
 export const RAW_DOC = `${REPO}/blob/master/`;
 export const RELEASES = `${REPO}/releases/latest`;
-export const VERSION = '0.4.3';
+export const VERSION = '0.4.4';
 
 export type Example = {
   id: string;

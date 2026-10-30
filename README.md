@@ -12,7 +12,7 @@ parsed, and compiled to Python **in memory**, then executed on
 
 <br>
 
-![version](https://img.shields.io/badge/version-0.4.3-2ea44f?style=for-the-badge&logo=semver)
+![version](https://img.shields.io/badge/version-0.4.4-2ea44f?style=for-the-badge&logo=semver)
 ![python](https://img.shields.io/badge/python-3.11%2B-3776ab?style=for-the-badge&logo=python&logoColor=white)
 ![license](https://img.shields.io/badge/license-MIT-3da639?style=for-the-badge&logo=open-source-initiative&logoColor=white)
 ![nixos](https://img.shields.io/badge/reproducible-NixOS-5277c3?style=for-the-badge&logo=nixos&logoColor=white)
@@ -83,11 +83,10 @@ python -m malt --help
 
 ### Interactive figures
 
-By default, development/CI runs use headless `Agg` (safe for tests and CI).
-Packaged Windows executables default to `Qt5Agg` so `malt run` can open figure
-windows without extra configuration. You can still override with `MPLBACKEND`.
-On Linux/Nix, to open real figure windows, select a GUI backend and provide a
-display server:
+By default, MALT uses Matplotlib's `Qt5Agg` backend on Windows and Linux, so
+`malt run` can open figure windows without extra configuration. You can always
+override this with `MPLBACKEND` (for example `MPLBACKEND=Agg` on headless CI).
+On Linux/Nix, opening real figure windows still requires a display server:
 
 ```bash
 MPLBACKEND=Qt5Agg nix develop -c python -m malt run examples/graphics/sine_plot.m

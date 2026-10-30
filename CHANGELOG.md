@@ -3,6 +3,17 @@
 All notable changes to MALT are documented here. This project follows
 `major.minor.patch`; within `0.x`, breaking changes bump the minor version.
 
+## [0.4.4] — 2026-10-30
+
+### Changed
+- Graphics backend defaults now use Matplotlib `Qt5Agg` on Linux and Windows
+  when `MPLBACKEND` is unset; `MPLBACKEND` still takes precedence (for example,
+  `Agg` on headless systems/CI).
+
+### Fixed
+- Repository-wide release/version references updated for `0.4.4`, including the
+  website in `page/`.
+
 ## [0.4.3] — 2026-10-29
 
 ### Fixed

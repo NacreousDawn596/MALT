@@ -11,4 +11,4 @@ echo "==> mypy"
 nix develop -c mypy src/malt
 
 echo "==> pytest"
-nix develop -c pytest "$@"
+MPLBACKEND=Agg nix develop -c pytest "$@"

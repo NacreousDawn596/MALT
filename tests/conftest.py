@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
+os.environ.setdefault("MPLBACKEND", "Agg")
 
 import malt.runtime.graphics as mg  # noqa: E402
 from malt.compiler import compile_source  # noqa: E402
