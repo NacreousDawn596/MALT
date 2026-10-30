@@ -93,6 +93,10 @@ The installer creates two Start Menu shortcuts:
 - **MALT REPL** — opens a terminal running `malt repl`.
 - **MALT GUI** — launches the Qt6 notebook without a console window.
 
+The packaged executables bundle Python plus NumPy, SciPy, Matplotlib, PyQt5,
+and PyQt6. On packaged Windows builds, plotting defaults to Matplotlib's
+`Qt5Agg` backend unless `MPLBACKEND` is explicitly set.
+
 It offers a task to add MALT to your **user** `PATH`. After a fresh install,
 open a **new** Command Prompt or PowerShell session so the updated `PATH`
 takes effect:
@@ -135,8 +139,8 @@ stdout (never startup banners). Editor setup is in
   Interactive windows need a display server and a GUI backend
   (`MPLBACKEND=Qt5Agg`, or `malt gui` which uses Qt6).
 - **Shared libraries** — the Windows installer bundles NumPy/SciPy/Matplotlib
-  and Qt6; the Debian package uses system packages. The runtime is **not** an
-  OS sandbox for untrusted code.
+  and both Qt5/Qt6 bindings; the Debian package uses system packages. The
+  runtime is **not** an OS sandbox for untrusted code.
 - **Python version** — the Debian package requires Python 3.11+.
 
 ## Verification
