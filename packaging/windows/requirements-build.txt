@@ -1,6 +1,5 @@
 numpy
 scipy
 matplotlib
-PyQt5
 PyQt6
 PyInstaller
