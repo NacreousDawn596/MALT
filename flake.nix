@@ -49,7 +49,7 @@
         # store (never `$PWD` or the host environment).
         maltPackage = pkgs.stdenv.mkDerivation {
           pname = "malt";
-          version = "0.4.3";
+          version = "0.4.4";
           src = self;
           buildInputs = [ pythonEnv ];
           buildPhase = "true";
@@ -60,7 +60,7 @@
             cat > "$out/bin/malt" <<EOF
             #!${pkgs.runtimeShell}
             export PYTHONPATH="$out/lib:\''${PYTHONPATH:-}"
-            export MPLBACKEND="\''${MPLBACKEND:-Agg}"
+            export MPLBACKEND="\''${MPLBACKEND:-Qt5Agg}"
             export QT_QPA_PLATFORM_PLUGIN_PATH="${qtbase.bin}/${qtbase.qtPluginPrefix}/platforms"
             export MALT_QT6_PLUGIN_PATH="${qt6base}/${qt6base.qtPluginPrefix}/platforms"
             exec ${pythonEnv}/bin/python -m malt "\$@"
