@@ -32,6 +32,8 @@ BUILTINS = frozenset(
         "isrow", "iscolumn", "isreal", "isfloat", "islogical", "isnan",
         "isinf", "isfinite", "lower", "upper", "strcmp", "strcmpi", "strcat",
         "strjoin", "strsplit", "num2str",
+        "tf", "ss", "dcgain", "step", "impulse", "lsim", "stepinfo",
+        "feedback", "series", "parallel", "pole", "zero",
     }
 )
 

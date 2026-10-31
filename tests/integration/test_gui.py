@@ -251,3 +251,33 @@ def test_gui_execution_timing(qapp, window):
     cell = window.cells[0]
     _run(window, cell, "x = 1;\n")
     assert cell._elapsed_ms >= 0.0
+
+
+def test_gui_autocompletion_builtins(qapp, window):
+    cell = window.cells[0]
+    comp = cell.input._completer
+    comp.setCompletionPrefix("sq")
+    assert comp.completionCount() >= 1
+    assert "sqrt" in [
+        comp.completionModel().index(i, 0).data() for i in range(comp.completionCount())
+    ]
+
+
+def test_gui_autocompletion_workspace_vars(qapp, window):
+    cell = window.cells[0]
+    window.repl._handle("my_custom_var = 1;")
+    window._refresh_workspace()
+    comp = cell.input._completer
+    comp.setCompletionPrefix("my_custom")
+    assert comp.completionCount() == 1
+    assert comp.completionModel().index(0, 0).data() == "my_custom_var"
+
+
+def test_gui_autocompletion_control_functions(qapp, window):
+    cell = window.cells[0]
+    comp = cell.input._completer
+    comp.setCompletionPrefix("ste")
+    names = [
+        comp.completionModel().index(i, 0).data() for i in range(comp.completionCount())
+    ]
+    assert "stepinfo" in names

@@ -40,7 +40,7 @@ from matplotlib.backends.backend_qtagg import (  # noqa: E402
     FigureCanvasQTAgg,
     NavigationToolbar2QT,
 )
-from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal  # noqa: E402
+from PyQt6.QtCore import QPoint, QStringListModel, Qt, QTimer, pyqtSignal  # noqa: E402
 from PyQt6.QtGui import (  # noqa: E402
     QColor,
     QFont,
@@ -54,6 +54,7 @@ from PyQt6.QtGui import (  # noqa: E402
 )
 from PyQt6.QtWidgets import (  # noqa: E402
     QApplication,
+    QCompleter,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -68,6 +69,7 @@ from PyQt6.QtWidgets import (  # noqa: E402
     QWidget,
 )
 
+from .builtins import BUILTINS  # noqa: E402
 from .executor import make_namespace  # noqa: E402
 from .repl.session import Repl  # noqa: E402
 from .runtime.arrays import as_array  # noqa: E402
@@ -75,6 +77,17 @@ from .runtime.arrays import as_array  # noqa: E402
 _TRAFFIC_RED = "#ff5f57"
 _TRAFFIC_YELLOW = "#febc2e"
 _TRAFFIC_GREEN = "#28c840"
+
+# Autocompletion vocabulary: builtins plus control keywords and constants.
+_COMPLETION_KEYWORDS = (
+    "if", "else", "elseif", "for", "while", "end", "break", "continue",
+    "return", "function", "switch", "case", "otherwise", "try", "catch",
+    "global", "parfor",
+)
+_COMPLETION_CONSTANTS = ("pi", "eps", "Inf", "NaN", "true", "false", "i", "j")
+_BASE_COMPLETIONS = sorted(
+    set(BUILTINS) | set(_COMPLETION_KEYWORDS) | set(_COMPLETION_CONSTANTS)
+)
 
 _STYLESHEET = """
 * {
@@ -293,8 +306,11 @@ class _Highlighter(QSyntaxHighlighter):
 
 
 class _CellInput(QPlainTextEdit):
-    """A multi-line editor that emits run signals on notebook shortcuts and
-    grows to fit its contents so code is never cramped."""
+    """A multi-line editor with autocompletion, run shortcuts, and auto-grow.
+
+    Autocompletion is LSP-style: builtins, keywords, constants, and live
+    workspace variables, shown as a popup as you type.
+    """
 
     run_inplace = pyqtSignal()
     run_and_next = pyqtSignal()
@@ -302,6 +318,55 @@ class _CellInput(QPlainTextEdit):
     def __init__(self) -> None:
         super().__init__()
         self.document().contentsChanged.connect(self._resize_to_fit)
+        self.textChanged.connect(self._maybe_complete)
+
+        self._completion_model = QStringListModel(_BASE_COMPLETIONS, self)
+        self._completer = QCompleter(self._completion_model, self)
+        self._completer.setWidget(self)
+        self._completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+        self._completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self._completer.activated.connect(self._insert_completion)
+
+    def set_completions(self, words: set[str]) -> None:
+        self._completion_model.setStringList(
+            sorted(set(words) | set(_BASE_COMPLETIONS))
+        )
+
+    def _word_under_cursor(self) -> tuple[str, int]:
+        cursor = self.textCursor()
+        line = cursor.block().text()
+        pos = cursor.positionInBlock()
+        start = pos
+        while start > 0 and (line[start - 1].isalnum() or line[start - 1] == "_"):
+            start -= 1
+        return line[start:pos], start
+
+    def _maybe_complete(self) -> None:
+        word, _ = self._word_under_cursor()
+        if len(word) < 2:
+            self._completer.popup().hide()
+            return
+        self._completer.setCompletionPrefix(word)
+        if self._completer.completionCount() == 0:
+            self._completer.popup().hide()
+            return
+        rect = self.cursorRect()
+        rect.setWidth(
+            self._completer.popup().sizeHintForColumn(0)
+            + self._completer.popup().verticalScrollBar().sizeHint().width()
+        )
+        self._completer.complete(rect)
+
+    def _insert_completion(self, text: str) -> None:
+        cursor = self.textCursor()
+        _, start = self._word_under_cursor()
+        cursor.movePosition(
+            cursor.MoveOperation.Left,
+            cursor.MoveMode.KeepAnchor,
+            cursor.positionInBlock() - start,
+        )
+        cursor.insertText(text)
+        self.setTextCursor(cursor)
 
     def _resize_to_fit(self) -> None:
         line_h = self.fontMetrics().lineSpacing()
@@ -883,9 +948,11 @@ class MainWindow(QMainWindow):
     def _refresh_workspace(self) -> None:
         self._workspace.clear()
         entries: list[tuple[str, str, str]] = []
+        names: set[str] = set()
         for name in sorted(self.repl.namespace):
             if name.startswith("_"):
                 continue
+            names.add(name)
             val = self.repl.namespace[name]
             a = as_array(val)
             if isinstance(a, str):
@@ -899,6 +966,8 @@ class MainWindow(QMainWindow):
             entries.append((name, shape, cls))
         for name, shape, cls in entries:
             QTreeWidgetItem(self._workspace, [name, shape, cls])
+        for cell in self.cells:
+            cell.input.set_completions(names)
 
 
 def run() -> int:

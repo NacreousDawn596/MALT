@@ -118,6 +118,20 @@ from .compat import (  # noqa: E402
     strsplit,
     upper,
 )
+from .controlsys import (  # noqa: E402
+    dcgain,
+    feedback,
+    impulse,
+    lsim,
+    parallel,
+    pole,
+    series,
+    ss,
+    step,
+    stepinfo,
+    tf,
+    zero,
+)
 from .functions import (  # noqa: E402
     abs,
     acos,
