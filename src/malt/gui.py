@@ -30,15 +30,15 @@ os.environ["QT_API"] = "PyQt6"
 os.environ["MPLBACKEND"] = "QtAgg"
 
 import matplotlib  # noqa: E402
+
+matplotlib.use("QtAgg")
+
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from matplotlib.backends.backend_qtagg import (  # noqa: E402
     FigureCanvasQTAgg,
     NavigationToolbar2QT,
 )
-
-matplotlib.use("QtAgg")
-
 from PyQt6.QtCore import QPoint, Qt, pyqtSignal  # noqa: E402
 from PyQt6.QtGui import (  # noqa: E402
     QColor,
