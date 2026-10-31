@@ -3,6 +3,17 @@
 All notable changes to MALT are documented here. This project follows
 `major.minor.patch`; within `0.x`, breaking changes bump the minor version.
 
+## [0.4.5] — 2026-10-30
+
+### Added
+- The Qt6 notebook GUI (`malt gui`) now embeds native Matplotlib figures in
+  cells via `FigureCanvasQTAgg` (QtAgg + PyQt6), with a figure lifecycle that
+  handles creation, cross-cell modification, closure, and re-execution without
+  duplicate canvases.
+- The website download section now offers per-platform download buttons (Debian
+  `.deb`, Windows installer + standalone executables, portable Linux tarball)
+  and a hero "Download" link.
+
 ## [0.4.4] — 2026-10-30
 
 ### Changed
