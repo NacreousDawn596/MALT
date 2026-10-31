@@ -16,6 +16,7 @@ import io
 import os
 import re
 import sys
+import time
 from contextlib import redirect_stderr, redirect_stdout
 from typing import cast
 
@@ -39,12 +40,13 @@ from matplotlib.backends.backend_qtagg import (  # noqa: E402
     FigureCanvasQTAgg,
     NavigationToolbar2QT,
 )
-from PyQt6.QtCore import QPoint, Qt, pyqtSignal  # noqa: E402
+from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal  # noqa: E402
 from PyQt6.QtGui import (  # noqa: E402
     QColor,
     QFont,
     QIcon,
     QKeySequence,
+    QPainter,
     QPixmap,
     QShortcut,
     QSyntaxHighlighter,
@@ -101,6 +103,10 @@ QScrollArea {
     border: 1px solid #e4e4e9;
     border-radius: 12px;
 }
+#Cell:hover {
+    border-color: #c7c7ce;
+    background-color: #fefefe;
+}
 #CellPrompt {
     font-family: "SF Mono", "Menlo", "Consolas", monospace;
     font-size: 11px;
@@ -122,6 +128,28 @@ QScrollArea {
     font-family: "SF Mono", "Menlo", "Consolas", monospace;
     font-size: 13px;
     color: #1d1d1f;
+}
+#FigureOutput {
+    background-color: #ffffff;
+    border: 1px solid #e4e4e9;
+    border-radius: 10px;
+}
+#FigureToolbar {
+    background-color: #f7f7f9;
+    border: none;
+    border-bottom: 1px solid #e4e4e9;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+    padding: 2px 4px;
+}
+#ResizeHandle {
+    background-color: transparent;
+    border-top: 1px solid #e4e4e9;
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+}
+#ResizeHandle:hover {
+    background-color: #eef3fb;
 }
 #RunButton {
     border: none;
@@ -265,10 +293,26 @@ class _Highlighter(QSyntaxHighlighter):
 
 
 class _CellInput(QPlainTextEdit):
-    """A multi-line editor that emits run signals on notebook shortcuts."""
+    """A multi-line editor that emits run signals on notebook shortcuts and
+    grows to fit its contents so code is never cramped."""
 
     run_inplace = pyqtSignal()
     run_and_next = pyqtSignal()
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.document().contentsChanged.connect(self._resize_to_fit)
+
+    def _resize_to_fit(self) -> None:
+        line_h = self.fontMetrics().lineSpacing()
+        h = self.document().blockCount() * line_h + 20
+        h = max(46, min(h, 800))
+        if abs(self.height() - h) > 2:
+            self.setFixedHeight(h)
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._resize_to_fit()
 
     def keyPressEvent(self, event) -> None:  # noqa: N802
         key = event.key()
@@ -291,23 +335,71 @@ class _CellInput(QPlainTextEdit):
         super().keyPressEvent(event)
 
 
+def _force_dark_icons(toolbar: NavigationToolbar2QT) -> None:
+    """Recolor matplotlib's toolbar icons dark so they read on a light theme
+    (matplotlib otherwise inherits the OS theme and can render white icons)."""
+    color = QColor("#3a3a3f")
+    for action in toolbar.actions():
+        icon = action.icon()
+        if icon.isNull():
+            continue
+        recolored = QIcon()
+        sizes = icon.availableSizes() or [toolbar.iconSize()]
+        for size in sizes:
+            pm = icon.pixmap(size)
+            if pm.isNull():
+                continue
+            painter = QPainter(pm)
+            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+            painter.fillRect(pm.rect(), color)
+            painter.end()
+            recolored.addPixmap(pm)
+        if not recolored.isNull():
+            action.setIcon(recolored)
+
+
 class FigureWidget(QFrame):
-    """A Matplotlib ``FigureCanvasQTAgg`` with a compact navigation toolbar."""
+    """A Matplotlib ``FigureCanvasQTAgg`` with a toolbar and a drag-resize handle."""
 
     def __init__(self, canvas: FigureCanvasQTAgg) -> None:
         super().__init__()
         self.setObjectName("FigureOutput")
         self.canvas = canvas
+        self._drag_start_y: float | None = None
+        self._drag_start_h = 0
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         self.toolbar = NavigationToolbar2QT(canvas, self)
         self.toolbar.setObjectName("FigureToolbar")
+        _force_dark_icons(self.toolbar)
         layout.addWidget(self.toolbar)
-        canvas.setMinimumHeight(180)
-        canvas.setMaximumHeight(640)
         canvas.setMinimumWidth(240)
+        canvas.setFixedHeight(300)
         layout.addWidget(canvas)
+
+        self._handle = QFrame()
+        self._handle.setObjectName("ResizeHandle")
+        self._handle.setFixedHeight(7)
+        self._handle.setCursor(Qt.CursorShape.SizeVerCursor)
+        self._handle.setToolTip("Drag to resize the figure")
+        self._handle.mousePressEvent = self._handle_press
+        self._handle.mouseMoveEvent = self._handle_move
+        self._handle.mouseReleaseEvent = self._handle_release
+        layout.addWidget(self._handle)
+
+    def _handle_press(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_start_y = event.globalPosition().y()
+            self._drag_start_h = self.canvas.height()
+
+    def _handle_move(self, event) -> None:
+        if self._drag_start_y is not None:
+            dy = event.globalPosition().y() - self._drag_start_y
+            self.canvas.setFixedHeight(max(140, min(1400, int(self._drag_start_h + dy))))
+
+    def _handle_release(self, event) -> None:
+        self._drag_start_y = None
 
 
 class Cell(QFrame):
@@ -329,6 +421,7 @@ class Cell(QFrame):
         self.figures: set[int] = set()  # figure numbers this cell displays
         self._text = ""
         self._error = ""
+        self._elapsed_ms = 0.0
         self._build()
 
     def _build(self) -> None:
@@ -361,8 +454,6 @@ class Cell(QFrame):
         self.input = _CellInput()
         self.input.setObjectName("CellInput")
         self.input.setPlaceholderText("enter code…  (Ctrl+Enter run, Shift+Enter run + next)")
-        self.input.setMinimumHeight(44)
-        self.input.setMaximumHeight(400)
         self.input.run_inplace.connect(lambda: self.run_inplace.emit(self))
         self.input.run_and_next.connect(lambda: self.run_and_next.emit(self))
         _Highlighter(self.input.document())
@@ -656,11 +747,13 @@ class MainWindow(QMainWindow):
         self._execute(cell, move_next=True)
 
     def _eval_into(self, cell: Cell, text: str) -> str | None:
+        start = time.perf_counter()
         out, err = io.StringIO(), io.StringIO()
         with redirect_stdout(out), redirect_stderr(err):
             action = self.repl._handle(text)
         cell._text = out.getvalue()
         cell._error = err.getvalue()
+        cell._elapsed_ms = (time.perf_counter() - start) * 1000
         return action
 
     def _run_text(self, cell: Cell, text: str) -> str | None:
@@ -711,8 +804,11 @@ class MainWindow(QMainWindow):
             after = set(plt.get_fignums())
             self._sync_figures(cell, before, after)
             self._refresh_workspace()
-            self._status.setText(f"{len(self.repl.namespace)} names in workspace")
+            self._status.setText(
+                f"{len(self.repl.namespace)} names · last run {cell._elapsed_ms:.1f} ms"
+            )
             self._render_all_cells()
+            self._flash_cell(cell)
             if action == "quit":
                 self.close()
                 return
@@ -727,6 +823,14 @@ class MainWindow(QMainWindow):
             else:
                 self.cells[idx + 1].focus_input()
         self._scroll_to_bottom()
+
+    def _flash_cell(self, cell: Cell) -> None:
+        """Briefly highlight the cell border to give execution feedback."""
+        cell.setStyleSheet(
+            "#Cell { background-color: #f4f8ff; border: 1px solid #0a84ff; "
+            "border-radius: 12px; }"
+        )
+        QTimer.singleShot(400, lambda: cell.setStyleSheet(""))
 
     def _run_all(self) -> None:
         self.repl.namespace = make_namespace()

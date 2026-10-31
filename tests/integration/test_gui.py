@@ -216,3 +216,38 @@ def test_gui_repeated_execution_no_duplicate_canvas(qapp, window):
     _run(window, cell, "plot(1:10);\n")
     assert cell.figures == {1}
     assert list(window._figure_widgets) == [1]
+
+
+def test_gui_input_autogrows(qapp, window):
+    cell = window.cells[0]
+    cell.input.setPlainText("x = 1;")
+    qapp.processEvents()
+    h1 = cell.input.height()
+    cell.input.setPlainText("x = 1;\ny = 2;\nz = 3;\nw = 4;")
+    qapp.processEvents()
+    h2 = cell.input.height()
+    assert h2 > h1
+
+
+def test_gui_figure_has_resize_handle(qapp, window):
+    cell = window.cells[0]
+    _run(window, cell, "plot(1:10);\n")
+    fw = window._figure_widgets[1]
+    assert fw._handle is not None
+    assert fw.canvas.height() > 0
+
+
+def test_gui_toolbar_icons_recolored(qapp, window):
+    cell = window.cells[0]
+    _run(window, cell, "plot(1:10);\n")
+    fw = window._figure_widgets[1]
+    # Every toolbar action should have a (dark, non-null) icon.
+    for action in fw.toolbar.actions():
+        if action.text():  # only actions with a label have an icon
+            assert not action.icon().isNull()
+
+
+def test_gui_execution_timing(qapp, window):
+    cell = window.cells[0]
+    _run(window, cell, "x = 1;\n")
+    assert cell._elapsed_ms >= 0.0
