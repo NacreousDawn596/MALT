@@ -17,12 +17,28 @@ import os
 import re
 import sys
 from contextlib import redirect_stderr, redirect_stdout
+from typing import cast
 
 # Must run before importing PyQt6.
 if os.environ.get("MALT_QT6_PLUGIN_PATH"):
     os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = os.environ["MALT_QT6_PLUGIN_PATH"]
 
+# The notebook embeds interactive Matplotlib figures, so select the Qt6 Agg
+# backend (via PyQt6) before the MALT runtime imports pyplot with its Agg
+# default. This only affects `malt gui` — the CLI still honors MPLBACKEND.
+os.environ["QT_API"] = "PyQt6"
+os.environ["MPLBACKEND"] = "QtAgg"
+
+import matplotlib  # noqa: E402
+import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
+from matplotlib.backends.backend_qtagg import (  # noqa: E402
+    FigureCanvasQTAgg,
+    NavigationToolbar2QT,
+)
+
+matplotlib.use("QtAgg")
+
 from PyQt6.QtCore import QPoint, Qt, pyqtSignal  # noqa: E402
 from PyQt6.QtGui import (  # noqa: E402
     QColor,
@@ -275,6 +291,25 @@ class _CellInput(QPlainTextEdit):
         super().keyPressEvent(event)
 
 
+class FigureWidget(QFrame):
+    """A Matplotlib ``FigureCanvasQTAgg`` with a compact navigation toolbar."""
+
+    def __init__(self, canvas: FigureCanvasQTAgg) -> None:
+        super().__init__()
+        self.setObjectName("FigureOutput")
+        self.canvas = canvas
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        self.toolbar = NavigationToolbar2QT(canvas, self)
+        self.toolbar.setObjectName("FigureToolbar")
+        layout.addWidget(self.toolbar)
+        canvas.setMinimumHeight(180)
+        canvas.setMaximumHeight(640)
+        canvas.setMinimumWidth(240)
+        layout.addWidget(canvas)
+
+
 class Cell(QFrame):
     """One editable input cell with an output area and a small toolbar."""
 
@@ -291,6 +326,9 @@ class Cell(QFrame):
         self.setObjectName("Cell")
         self.number = number
         self.exec_number: int | None = None
+        self.figures: set[int] = set()  # figure numbers this cell displays
+        self._text = ""
+        self._error = ""
         self._build()
 
     def _build(self) -> None:
@@ -330,12 +368,24 @@ class Cell(QFrame):
         _Highlighter(self.input.document())
         layout.addWidget(self.input)
 
-        self.output = QPlainTextEdit()
-        self.output.setObjectName("CellOutput")
-        self.output.setReadOnly(True)
-        self.output.setMaximumHeight(240)
-        self.output.hide()
-        layout.addWidget(self.output)
+        self.output_container = QWidget()
+        self.output_container.setObjectName("CellOutputArea")
+        self._output_layout = QVBoxLayout(self.output_container)
+        self._output_layout.setContentsMargins(0, 0, 0, 0)
+        self._output_layout.setSpacing(8)
+        self.output_container.hide()
+        layout.addWidget(self.output_container)
+
+        self.text_output = QPlainTextEdit()
+        self.text_output.setObjectName("CellOutput")
+        self.text_output.setReadOnly(True)
+        self.text_output.setMaximumHeight(220)
+        self.text_output.hide()
+        self.error_output = QPlainTextEdit()
+        self.error_output.setObjectName("CellOutput")
+        self.error_output.setReadOnly(True)
+        self.error_output.setMaximumHeight(220)
+        self.error_output.hide()
 
     def mark_run(self, n: int) -> None:
         self.exec_number = n
@@ -344,19 +394,36 @@ class Cell(QFrame):
     def text(self) -> str:
         return self.input.toPlainText()
 
-    def set_output(self, text: str, error: bool = False) -> None:
-        self.output.setPlainText(text)
-        if error:
-            self.output.setStyleSheet(
-                "#CellOutput { color: #d70015; background-color: #fafafa; }"
-            )
-        else:
-            self.output.setStyleSheet("")
-        self.output.show()
+    def _clear_output_layout(self) -> None:
+        while self._output_layout.count():
+            item = self._output_layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.hide()
+
+    def render_output(self, figures: list[FigureWidget]) -> None:
+        self._clear_output_layout()
+        if self._text:
+            self.text_output.setPlainText(self._text)
+            self.text_output.setStyleSheet("#CellOutput { color: #1d1d1f; background-color: #fafafa; }")
+            self._output_layout.addWidget(self.text_output)
+            self.text_output.show()
+        if self._error:
+            self.error_output.setPlainText(self._error)
+            self.error_output.setStyleSheet("#CellOutput { color: #d70015; background-color: #fafafa; }")
+            self._output_layout.addWidget(self.error_output)
+            self.error_output.show()
+        for fw in figures:
+            self._output_layout.addWidget(fw)
+            fw.show()
+        self.output_container.setVisible(bool(self._text or self._error or figures))
 
     def clear_output(self) -> None:
-        self.output.clear()
-        self.output.hide()
+        self._text = ""
+        self._error = ""
+        self.figures.clear()
+        self._clear_output_layout()
+        self.output_container.hide()
 
     def focus_input(self) -> None:
         self.input.setFocus()
@@ -405,6 +472,7 @@ class MainWindow(QMainWindow):
         self.cells: list[Cell] = []
         self._counter = 0
         self._exec_count = 0
+        self._figure_widgets: dict[int, FigureWidget] = {}
         self.setWindowTitle("MALT")
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Window)
         logo = _find_logo()
@@ -591,10 +659,8 @@ class MainWindow(QMainWindow):
         out, err = io.StringIO(), io.StringIO()
         with redirect_stdout(out), redirect_stderr(err):
             action = self.repl._handle(text)
-        if out.getvalue():
-            cell.set_output(out.getvalue())
-        if err.getvalue():
-            cell.set_output(err.getvalue(), error=True)
+        cell._text = out.getvalue()
+        cell._error = err.getvalue()
         return action
 
     def _run_text(self, cell: Cell, text: str) -> str | None:
@@ -602,16 +668,58 @@ class MainWindow(QMainWindow):
         cell.mark_run(self._exec_count)
         return self._eval_into(cell, text)
 
+    # -- figure management --------------------------------------------------
+    def _figure_widget(self, fig_num: int) -> FigureWidget:
+        fw = self._figure_widgets.get(fig_num)
+        if fw is None:
+            fig = plt.figure(fig_num)
+            fw = FigureWidget(cast(FigureCanvasQTAgg, fig.canvas))
+            self._figure_widgets[fig_num] = fw
+        return fw
+
+    def _close_figure(self, fig_num: int) -> None:
+        fw = self._figure_widgets.pop(fig_num, None)
+        if fw is not None:
+            fw.deleteLater()
+
+    def _sync_figures(self, cell: Cell, before: set[int], after: set[int]) -> None:
+        for f in before - after:
+            self._close_figure(f)
+            for c in self.cells:
+                c.figures.discard(f)
+        for f in after - before:
+            cell.figures.add(f)
+            self._figure_widget(f)
+        for fw in self._figure_widgets.values():
+            fw.canvas.draw_idle()
+
+    def _render_cell(self, cell: Cell) -> None:
+        widgets = [
+            self._figure_widgets[f] for f in sorted(cell.figures) if f in self._figure_widgets
+        ]
+        cell.render_output(widgets)
+
+    def _render_all_cells(self) -> None:
+        for c in self.cells:
+            self._render_cell(c)
+
     def _execute(self, cell: Cell, move_next: bool) -> None:
-        cell.clear_output()
         text = cell.text().strip()
         if text:
+            before = set(plt.get_fignums())
             action = self._run_text(cell, text)
+            after = set(plt.get_fignums())
+            self._sync_figures(cell, before, after)
             self._refresh_workspace()
             self._status.setText(f"{len(self.repl.namespace)} names in workspace")
+            self._render_all_cells()
             if action == "quit":
                 self.close()
                 return
+        else:
+            cell._text = ""
+            cell._error = ""
+            self._render_all_cells()
         if move_next:
             idx = self.cells.index(cell)
             if idx == len(self.cells) - 1:
@@ -622,14 +730,26 @@ class MainWindow(QMainWindow):
 
     def _run_all(self) -> None:
         self.repl.namespace = make_namespace()
+        plt.close("all")
+        for fw in self._figure_widgets.values():
+            fw.deleteLater()
+        self._figure_widgets.clear()
         for cell in self.cells:
-            cell.clear_output()
+            cell.figures.clear()
+            cell._text = ""
+            cell._error = ""
+        for cell in self.cells:
             text = cell.text().strip()
             if text:
-                if self._run_text(cell, text) == "quit":
+                before = set(plt.get_fignums())
+                action = self._run_text(cell, text)
+                after = set(plt.get_fignums())
+                self._sync_figures(cell, before, after)
+                if action == "quit":
                     break
         self._refresh_workspace()
         self._status.setText(f"{len(self.repl.namespace)} names in workspace")
+        self._render_all_cells()
         self._scroll_to_bottom()
 
     def _scroll_to_bottom(self) -> None:
@@ -637,8 +757,16 @@ class MainWindow(QMainWindow):
         bar.setValue(bar.maximum())
 
     def _clear_outputs(self) -> None:
+        plt.close("all")
+        for fw in self._figure_widgets.values():
+            fw.deleteLater()
+        self._figure_widgets.clear()
         for c in self.cells:
-            c.clear_output()
+            c._text = ""
+            c._error = ""
+            c.figures.clear()
+            c._clear_output_layout()
+            c.output_container.hide()
 
     # -- title-bar drag -----------------------------------------------------
     def _toggle_maximize(self) -> None:

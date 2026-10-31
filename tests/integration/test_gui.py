@@ -42,13 +42,13 @@ def test_gui_edit_previous_cell(qapp, window):
     cell.input.setPlainText("x = 1")
     window._execute(cell, move_next=False)
     assert window.repl.namespace["x"] == 1
-    assert "1" in cell.output.toPlainText()
+    assert "1" in cell.text_output.toPlainText()
     # Edit and re-run the same cell; output is replaced, not appended.
     cell.input.setPlainText("x = 2")
     window._execute(cell, move_next=False)
     assert window.repl.namespace["x"] == 2
-    assert "2" in cell.output.toPlainText()
-    assert "1" not in cell.output.toPlainText()
+    assert "2" in cell.text_output.toPlainText()
+    assert "1" not in cell.text_output.toPlainText()
 
 
 def test_gui_shared_workspace_across_cells(qapp, window):
@@ -154,3 +154,65 @@ def test_highlight_tokenizer():
     assert "keyword" in kinds
     assert "number" in kinds
     assert "comment" in kinds
+
+
+# ---------------------------------------------------------------------------
+# Matplotlib figure embedding
+# ---------------------------------------------------------------------------
+
+
+def _run(window, cell, code):
+    cell.input.setPlainText(code)
+    window._execute(cell, move_next=False)
+
+
+def test_gui_figure_renders_in_cell(qapp, window):
+    cell = window.cells[0]
+    _run(window, cell, "x = linspace(0, 2*pi, 200);\nplot(x, sin(x));\n")
+    assert cell.figures == {1}
+    assert 1 in window._figure_widgets
+
+
+def test_gui_multiple_figures(qapp, window):
+    cell = window.cells[0]
+    _run(window, cell, "figure(1);\nplot(1:10);\nfigure(2);\nplot(1:10);\n")
+    assert cell.figures == {1, 2}
+    assert set(window._figure_widgets) == {1, 2}
+
+
+def test_gui_figure_modification_cross_cell(qapp, window):
+    c0 = window.cells[0]
+    _run(window, c0, "x = linspace(0, 2*pi, 200);\nfigure(1);\nplot(x, sin(x));\n")
+    assert c0.figures == {1}
+    c1 = window._add_cell()
+    _run(window, c1, "hold on;\nplot(x, cos(x));\n")
+    # figure 1 stays with the cell that created it; no duplicate canvas
+    assert c0.figures == {1}
+    assert c1.figures == set()
+    assert list(window._figure_widgets) == [1]
+
+
+def test_gui_figure_close_removes_canvas(qapp, window):
+    cell = window.cells[0]
+    _run(window, cell, "figure(1);\nplot(1:10);\n")
+    assert 1 in window._figure_widgets
+    _run(window, cell, "close(1);\n")
+    assert 1 not in window._figure_widgets
+    assert cell.figures == set()
+
+
+def test_gui_error_after_plot_preserves_figure(qapp, window):
+    cell = window.cells[0]
+    _run(window, cell, "plot(1:10);\ndisp(undefined_var);\n")
+    # the plot survives even though the second statement errors
+    assert cell.figures == {1}
+    assert 1 in window._figure_widgets
+    assert "undefined" in cell.error_output.toPlainText()
+
+
+def test_gui_repeated_execution_no_duplicate_canvas(qapp, window):
+    cell = window.cells[0]
+    _run(window, cell, "plot(1:10);\n")
+    _run(window, cell, "plot(1:10);\n")
+    assert cell.figures == {1}
+    assert list(window._figure_widgets) == [1]
