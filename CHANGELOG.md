@@ -3,6 +3,33 @@
 All notable changes to MALT are documented here. This project follows
 `major.minor.patch`; within `0.x`, breaking changes bump the minor version.
 
+## [0.4.7] — 2026-10-31
+
+### Added
+- **Control systems toolbox** — `tf`, `ss`, `dcgain`, `step`, `impulse`,
+  `lsim`, `stepinfo`, `feedback`, `series`, `parallel`, `pole`, and `zero`,
+  backed by `scipy.signal`.
+- **Extended numerics** — special functions (`gamma`, `beta`, `erf`, …), dense
+  and sparse linear algebra, polynomial/interpolation/calculus routines
+  (`polyval`, `roots`, `polyfit`, `interp1`, `diff`, `cumtrapz`, `ode45`),
+  statistics (`mean`, `median`, `std`, `var`, `cov`, `corrcoef`), and signal
+  processing (`fft`, `ifft`, `conv`, `filter`, `freqz`, …).
+- **GUI autocompletion** — builtins, keywords, constants, and live workspace
+  variables, shown as a popup as you type.
+- **GUI polish** — dark toolbar icons, auto-growing code cells, drag-resize
+  figures, execution timing, and hover/flash feedback.
+- **GUI figure interaction** — scroll-wheel zoom on embedded figures, plus an
+  "open in a new window" button with its own toolbar and zoom.
+
+### Fixed
+- Replaced `QSyntaxHighlighter.setFormat` (silently broken in Qt 6.12) with
+  manual `QTextCursor`-based highlighting, and refreshed the syntax palette
+  (function tokens, italic comments, bold keywords).
+- Deleting a cell no longer tries to destroy already-deleted figure widgets;
+  quieted Wayland `textinput` spam.
+- The website's Debian install command now derives its version from `VERSION`
+  instead of a hardcoded `0.4.4`.
+
 ## [0.4.6] — 2026-10-30
 
 ### Fixed
