@@ -1,7 +1,26 @@
 export const REPO = 'https://github.com/NacreousDawn596/MALT';
 export const RAW_DOC = `${REPO}/blob/master/`;
 export const RELEASES = `${REPO}/releases/latest`;
-export const VERSION = '0.4.4';
+export const VERSION = '0.4.5';
+
+// The release tag whose assets the download buttons link to. Update this
+// (and the file names below) when a new release is published.
+export const RELEASE_TAG = 'v0.4.3';
+export const RELEASE_DL = `${REPO}/releases/download/${RELEASE_TAG}`;
+
+export type Download = { label: string; file: string; meta: string };
+export const downloads: Record<string, Download[]> = {
+  nix: [],
+  debian: [{ label: 'Debian package (.deb)', file: 'malt_0.4.3_amd64.deb', meta: 'amd64' }],
+  windows: [
+    { label: 'Windows installer (.exe)', file: 'MALT-Setup-0.4.3-x64.exe', meta: 'x64' },
+    { label: 'Standalone CLI (malt.exe)', file: 'malt.exe', meta: 'x64' },
+    { label: 'Standalone GUI (malt-gui.exe)', file: 'malt-gui.exe', meta: 'x64' },
+  ],
+  portable: [
+    { label: 'Portable Linux (tar.gz)', file: 'malt-linux-portable-amd64.tar.gz', meta: 'amd64' },
+  ],
+};
 
 export type Example = {
   id: string;
