@@ -293,7 +293,7 @@ def test_gui_syntax_highlighting_applied(qapp, window):
     cur.setPosition(0)
     cur.setPosition(3, QTextCursor.MoveMode.KeepAnchor)
     fmt = cur.charFormat()
-    assert fmt.foreground().color().name() == "#9b2393"  # keyword purple
+    assert fmt.foreground().color().name() == "#a626a4"  # keyword magenta
 
 
 def test_gui_autocompletion_typing_flow(qapp, window):

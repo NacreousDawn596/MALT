@@ -45,7 +45,7 @@ from matplotlib.backends.backend_qtagg import (  # noqa: E402
     FigureCanvasQTAgg,
     NavigationToolbar2QT,
 )
-from PyQt6.QtCore import QPoint, QStringListModel, Qt, QTimer, pyqtSignal  # noqa: E402
+from PyQt6.QtCore import QEvent, QObject, QPoint, QStringListModel, Qt, QTimer, pyqtSignal  # noqa: E402
 from PyQt6.QtGui import (  # noqa: E402
     QColor,
     QFont,
@@ -271,10 +271,11 @@ def _find_logo() -> str | None:
 # ---------------------------------------------------------------------------
 
 _HIGHLIGHT_COLORS = {
-    "keyword": QColor("#9b2393"),
-    "string": QColor("#c41a16"),
-    "number": QColor("#272ad8"),
-    "comment": QColor("#536579"),
+    "keyword": QColor("#a626a4"),
+    "string": QColor("#50a14f"),
+    "number": QColor("#986801"),
+    "comment": QColor("#a0a1a7"),
+    "function": QColor("#4078f2"),
 }
 
 _HIGHLIGHT_RE: list[tuple[str, re.Pattern[str]]] = [
@@ -288,6 +289,7 @@ _HIGHLIGHT_RE: list[tuple[str, re.Pattern[str]]] = [
             r"try|catch|break|continue|return|global|parfor)\b"
         ),
     ),
+    ("function", re.compile(r"\b[A-Za-z_]\w*(?=\s*\()")),
 ]
 
 
@@ -301,17 +303,25 @@ def tokenize_highlight(text: str) -> list[tuple[int, int, str]]:
     return spans
 
 
+def _span_format(kind: str) -> QTextCharFormat:
+    fmt = QTextCharFormat()
+    fmt.setForeground(_HIGHLIGHT_COLORS[kind])
+    if kind == "keyword":
+        fmt.setFontWeight(QFont.Weight.Bold)
+    elif kind == "comment":
+        fmt.setFontItalic(True)
+    elif kind == "function":
+        fmt.setFontWeight(QFont.Weight.DemiBold)
+    return fmt
+
+
 class _Highlighter(QSyntaxHighlighter):
     # NOTE: QSyntaxHighlighter.setFormat is broken in Qt 6.12 (formats are
     # silently dropped), so this class is kept only for API compatibility;
     # _CellInput uses _apply_highlighting instead.
     def highlightBlock(self, text: str) -> None:  # noqa: N802
         for start, length, kind in tokenize_highlight(text):
-            fmt = QTextCharFormat()
-            fmt.setForeground(_HIGHLIGHT_COLORS[kind])
-            if kind == "keyword":
-                fmt.setFontWeight(QFont.Weight.Bold)
-            self.setFormat(start, length, fmt)
+            self.setFormat(start, length, _span_format(kind))
 
 
 def _apply_highlighting(doc: Any) -> None:
@@ -324,14 +334,10 @@ def _apply_highlighting(doc: Any) -> None:
     reset.select(QTextCursor.SelectionType.Document)
     reset.setCharFormat(QTextCharFormat())
     for start, length, kind in tokenize_highlight(text):
-        fmt = QTextCharFormat()
-        fmt.setForeground(_HIGHLIGHT_COLORS[kind])
-        if kind == "keyword":
-            fmt.setFontWeight(QFont.Weight.Bold)
         cur = QTextCursor(doc)
         cur.setPosition(start)
         cur.setPosition(start + length, QTextCursor.MoveMode.KeepAnchor)
-        cur.mergeCharFormat(fmt)
+        cur.mergeCharFormat(_span_format(kind))
 
 
 class _CellInput(QPlainTextEdit):
@@ -466,18 +472,89 @@ def _force_dark_icons(toolbar: NavigationToolbar2QT) -> None:
             action.setIcon(recolored)
 
 
+def _zoom_axes(fig: Any, factor: float) -> None:
+    """Zoom every axes of ``fig`` around its center by ``factor`` (<1 in, >1 out)."""
+    for ax in fig.axes:
+        for getlim, setlim in ((ax.get_xlim, ax.set_xlim), (ax.get_ylim, ax.set_ylim)):
+            lo, hi = getlim()
+            center = (lo + hi) / 2.0
+            half = (hi - lo) / 2.0 * factor
+            setlim(center - half, center + half)
+    fig.canvas.draw_idle()
+
+
+class _WheelZoomFilter(QObject):
+    """Scroll-wheel zoom for a matplotlib canvas."""
+
+    def __init__(self, fig: Any) -> None:
+        super().__init__()
+        self._fig = fig
+
+    def eventFilter(self, obj: Any, event: Any) -> bool:  # noqa: N802
+        if event.type() == QEvent.Type.Wheel:
+            delta = event.angleDelta().y()
+            _zoom_axes(self._fig, 0.8 if delta > 0 else 1.25)
+            return True
+        return super().eventFilter(obj, event)
+
+
+class _FigureWindow(QMainWindow):
+    """A standalone, resizable window showing one figure (with zoom + toolbar)."""
+
+    def __init__(
+        self,
+        fig: Any,
+        number: int,
+        canvas: FigureCanvasQTAgg,
+        restore_canvas: FigureCanvasQTAgg,
+    ) -> None:
+        super().__init__()
+        self.setWindowTitle(f"MALT — Figure {number}")
+        self.setWindowIcon(QIcon(_find_logo() or ""))
+        self.canvas = canvas
+        self._fig = fig
+        self._restore_canvas = restore_canvas
+        self.toolbar = NavigationToolbar2QT(canvas, self)
+        _force_dark_icons(self.toolbar)
+        self.addToolBar(self.toolbar)
+        self.setCentralWidget(canvas)
+        self.resize(840, 620)
+        canvas.setMinimumSize(320, 240)
+        self._zoom_filter = _WheelZoomFilter(fig)
+        canvas.installEventFilter(self._zoom_filter)
+        canvas.draw_idle()
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        # Restore the embedded canvas as the figure's active canvas so
+        # `savefig` and future plots target the notebook view again.
+        self._fig.canvas = self._restore_canvas
+        self._restore_canvas.draw_idle()
+        super().closeEvent(event)
+
+
 class FigureWidget(QFrame):
     """A Matplotlib ``FigureCanvasQTAgg`` with a toolbar and a drag-resize handle."""
 
-    def __init__(self, canvas: FigureCanvasQTAgg) -> None:
+    def __init__(self, canvas: FigureCanvasQTAgg, fig_num: int = 1) -> None:
         super().__init__()
         self.setObjectName("FigureOutput")
         self.canvas = canvas
+        self._fig_num = fig_num
         self._drag_start_y: float | None = None
         self._drag_start_h = 0
+        self._window: _FigureWindow | None = None
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
+
+        header = QHBoxLayout()
+        header.setContentsMargins(6, 4, 6, 0)
+        header.addStretch(1)
+        self._open_btn = _cell_button("⧉", "Open in a new window")
+        header.addWidget(self._open_btn)
+        self._open_btn.clicked.connect(self._open_window)
+        layout.addLayout(header)
+
         self.toolbar = NavigationToolbar2QT(canvas, self)
         self.toolbar.setObjectName("FigureToolbar")
         _force_dark_icons(self.toolbar)
@@ -485,6 +562,9 @@ class FigureWidget(QFrame):
         canvas.setMinimumWidth(240)
         canvas.setFixedHeight(300)
         layout.addWidget(canvas)
+
+        self._zoom_filter = _WheelZoomFilter(canvas.figure)
+        canvas.installEventFilter(self._zoom_filter)
 
         self._handle = QFrame()
         self._handle.setObjectName("ResizeHandle")
@@ -495,6 +575,18 @@ class FigureWidget(QFrame):
         self._handle.mouseMoveEvent = self._handle_move
         self._handle.mouseReleaseEvent = self._handle_release
         layout.addWidget(self._handle)
+
+    def _open_window(self) -> None:
+        # A new canvas for the same figure lets the window be independent of
+        # the embedded view; the figure data is shared.
+        win = _FigureWindow(
+            self.canvas.figure,
+            self._fig_num,
+            FigureCanvasQTAgg(self.canvas.figure),
+            self.canvas,
+        )
+        self._window = win
+        win.show()
 
     def _handle_press(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
@@ -877,7 +969,7 @@ class MainWindow(QMainWindow):
         fw = self._figure_widgets.get(fig_num)
         if fw is None:
             fig = plt.figure(fig_num)
-            fw = FigureWidget(cast(FigureCanvasQTAgg, fig.canvas))
+            fw = FigureWidget(cast(FigureCanvasQTAgg, fig.canvas), fig_num)
             self._figure_widgets[fig_num] = fw
         return fw
 
