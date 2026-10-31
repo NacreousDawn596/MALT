@@ -155,7 +155,7 @@ function Installation() {
   const tabs=[{id:'nix',label:'Nix / NixOS'},{id:'debian',label:'Debian / Ubuntu'},{id:'windows',label:'Windows'},{id:'portable',label:'Portable Linux'}];
   const commands:Record<string,string>={
     nix:'nix run github:NacreousDawn596/MALT -- --version\n\nnix profile install github:NacreousDawn596/MALT\nmalt --version',
-    debian:'sudo apt install ./malt_0.4.4_amd64.deb\nmalt --version\nmalt repl',
+    debian:`sudo apt install ./malt_${VERSION}_amd64.deb\nmalt --version\nmalt repl`,
     windows:'malt --version\nmalt eval "2 + 2"\nmalt repl\nmalt gui',
     portable:'tar -xzf malt-linux-portable-amd64.tar.gz\n./dist/malt/malt --version\n./dist/malt/malt repl',
   };
