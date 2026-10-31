@@ -18,7 +18,7 @@ import re
 import sys
 import time
 from contextlib import redirect_stderr, redirect_stdout
-from typing import cast
+from typing import Any, cast
 
 # Must run before importing PyQt6.
 if os.environ.get("MALT_QT6_PLUGIN_PATH"):
@@ -56,6 +56,7 @@ from PyQt6.QtGui import (  # noqa: E402
     QShortcut,
     QSyntaxHighlighter,
     QTextCharFormat,
+    QTextCursor,
 )
 from PyQt6.QtWidgets import (  # noqa: E402
     QApplication,
@@ -301,6 +302,9 @@ def tokenize_highlight(text: str) -> list[tuple[int, int, str]]:
 
 
 class _Highlighter(QSyntaxHighlighter):
+    # NOTE: QSyntaxHighlighter.setFormat is broken in Qt 6.12 (formats are
+    # silently dropped), so this class is kept only for API compatibility;
+    # _CellInput uses _apply_highlighting instead.
     def highlightBlock(self, text: str) -> None:  # noqa: N802
         for start, length, kind in tokenize_highlight(text):
             fmt = QTextCharFormat()
@@ -308,6 +312,26 @@ class _Highlighter(QSyntaxHighlighter):
             if kind == "keyword":
                 fmt.setFontWeight(QFont.Weight.Bold)
             self.setFormat(start, length, fmt)
+
+
+def _apply_highlighting(doc: Any) -> None:
+    """Apply MATLAB syntax highlighting to a document via QTextCursor.
+
+    (Works around the Qt 6.12 QSyntaxHighlighter regression.)
+    """
+    text = doc.toPlainText()
+    reset = QTextCursor(doc)
+    reset.select(QTextCursor.SelectionType.Document)
+    reset.setCharFormat(QTextCharFormat())
+    for start, length, kind in tokenize_highlight(text):
+        fmt = QTextCharFormat()
+        fmt.setForeground(_HIGHLIGHT_COLORS[kind])
+        if kind == "keyword":
+            fmt.setFontWeight(QFont.Weight.Bold)
+        cur = QTextCursor(doc)
+        cur.setPosition(start)
+        cur.setPosition(start + length, QTextCursor.MoveMode.KeepAnchor)
+        cur.mergeCharFormat(fmt)
 
 
 class _CellInput(QPlainTextEdit):
@@ -322,8 +346,8 @@ class _CellInput(QPlainTextEdit):
 
     def __init__(self) -> None:
         super().__init__()
-        self.document().contentsChanged.connect(self._resize_to_fit)
-        self.textChanged.connect(self._maybe_complete)
+        self._highlighting = False
+        self.textChanged.connect(self._on_text_changed)
 
         self._completion_model = QStringListModel(_BASE_COMPLETIONS, self)
         self._completer = QCompleter(self._completion_model, self)
@@ -331,6 +355,20 @@ class _CellInput(QPlainTextEdit):
         self._completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
         self._completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         self._completer.activated.connect(self._insert_completion)
+
+    def _on_text_changed(self) -> None:
+        self._resize_to_fit()
+        self._apply_highlight()
+        self._maybe_complete()
+
+    def _apply_highlight(self) -> None:
+        if self._highlighting:
+            return
+        self._highlighting = True
+        try:
+            _apply_highlighting(self.document())
+        finally:
+            self._highlighting = False
 
     def set_completions(self, words: set[str]) -> None:
         self._completion_model.setStringList(
@@ -526,7 +564,6 @@ class Cell(QFrame):
         self.input.setPlaceholderText("enter code…  (Ctrl+Enter run, Shift+Enter run + next)")
         self.input.run_inplace.connect(lambda: self.run_inplace.emit(self))
         self.input.run_and_next.connect(lambda: self.run_and_next.emit(self))
-        _Highlighter(self.input.document())
         layout.addWidget(self.input)
 
         self.output_container = QWidget()

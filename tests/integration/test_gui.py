@@ -283,6 +283,33 @@ def test_gui_autocompletion_control_functions(qapp, window):
     assert "stepinfo" in names
 
 
+def test_gui_syntax_highlighting_applied(qapp, window):
+    from PyQt6.QtGui import QTextCursor
+
+    cell = window.cells[0]
+    cell.input.setPlainText("for k = 1:10\n  x = sin(k);\nend")
+    qapp.processEvents()
+    cur = QTextCursor(cell.input.document())
+    cur.setPosition(0)
+    cur.setPosition(3, QTextCursor.MoveMode.KeepAnchor)
+    fmt = cur.charFormat()
+    assert fmt.foreground().color().name() == "#9b2393"  # keyword purple
+
+
+def test_gui_autocompletion_typing_flow(qapp, window):
+    from PyQt6.QtGui import QTextCursor
+
+    cell = window.cells[0]
+    cell.input.insertPlainText("sq")
+    cur = cell.input.textCursor()
+    cur.movePosition(QTextCursor.MoveOperation.End)
+    cell.input.setTextCursor(cur)
+    qapp.processEvents()
+    comp = cell.input._completer
+    assert comp.completionPrefix() == "sq"
+    assert comp.completionCount() < 100  # filtered, not the full vocabulary
+
+
 def test_gui_delete_cell_with_figure_then_run_all(qapp, window):
     c0 = window.cells[0]
     c0.input.setPlainText("plot(1:10);")
