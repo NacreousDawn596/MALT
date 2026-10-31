@@ -24,6 +24,11 @@ from typing import cast
 if os.environ.get("MALT_QT6_PLUGIN_PATH"):
     os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = os.environ["MALT_QT6_PLUGIN_PATH"]
 
+# Quiet the repetitive Qt Wayland text-input v3 warnings (cosmetic only).
+_rules = os.environ.get("QT_LOGGING_RULES", "")
+_suppress = "qt.qpa.wayland.textinput=false"
+os.environ["QT_LOGGING_RULES"] = f"{_rules};{_suppress}" if _rules else _suppress
+
 # The notebook embeds interactive Matplotlib figures, so select the Qt6 Agg
 # backend (via PyQt6) before the MALT runtime imports pyplot with its Agg
 # default. This only affects `malt gui` — the CLI still honors MPLBACKEND.
@@ -790,6 +795,10 @@ class MainWindow(QMainWindow):
     def _delete_cell(self, cell: Cell) -> None:
         if cell not in self.cells:
             return
+        # The cell owns its figure widgets as children; drop our references so
+        # a later "Run all" doesn't try to delete already-destroyed widgets.
+        for f in list(cell.figures):
+            self._figure_widgets.pop(f, None)
         self.cells.remove(cell)
         self._layout.removeWidget(cell)
         cell.deleteLater()
@@ -838,7 +847,14 @@ class MainWindow(QMainWindow):
     def _close_figure(self, fig_num: int) -> None:
         fw = self._figure_widgets.pop(fig_num, None)
         if fw is not None:
-            fw.deleteLater()
+            self._safe_delete_later(fw)
+
+    @staticmethod
+    def _safe_delete_later(widget: QWidget) -> None:
+        try:
+            widget.deleteLater()
+        except RuntimeError:
+            pass  # C++ object already destroyed (e.g. its parent cell was deleted)
 
     def _sync_figures(self, cell: Cell, before: set[int], after: set[int]) -> None:
         for f in before - after:
@@ -901,7 +917,7 @@ class MainWindow(QMainWindow):
         self.repl.namespace = make_namespace()
         plt.close("all")
         for fw in self._figure_widgets.values():
-            fw.deleteLater()
+            self._safe_delete_later(fw)
         self._figure_widgets.clear()
         for cell in self.cells:
             cell.figures.clear()
@@ -928,7 +944,7 @@ class MainWindow(QMainWindow):
     def _clear_outputs(self) -> None:
         plt.close("all")
         for fw in self._figure_widgets.values():
-            fw.deleteLater()
+            self._safe_delete_later(fw)
         self._figure_widgets.clear()
         for c in self.cells:
             c._text = ""

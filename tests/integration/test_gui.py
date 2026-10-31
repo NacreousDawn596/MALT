@@ -281,3 +281,15 @@ def test_gui_autocompletion_control_functions(qapp, window):
         comp.completionModel().index(i, 0).data() for i in range(comp.completionCount())
     ]
     assert "stepinfo" in names
+
+
+def test_gui_delete_cell_with_figure_then_run_all(qapp, window):
+    c0 = window.cells[0]
+    c0.input.setPlainText("plot(1:10);")
+    window._execute(c0, move_next=False)
+    c1 = window._add_cell()
+    c1.input.setPlainText("figure(2); plot(1:20);")
+    window._execute(c1, move_next=False)
+    window._delete_cell(c0)  # cell 0 owned figure 1
+    window._run_all()  # must not crash on a stale FigureWidget
+    assert set(window._figure_widgets) <= {1, 2}
