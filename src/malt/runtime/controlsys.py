@@ -14,7 +14,7 @@ from scipy import signal as _sig
 
 from ..errors import RuntimeError_
 from . import graphics as _graphics
-from .arrays import as_array
+from .arrays import as_array, scalar_value
 from .cells import Struct
 
 
@@ -246,3 +246,318 @@ def zero(sys: Any) -> np.ndarray:
     s = _lti(sys)
     z, _, _ = _sig.ss2zpk(np.asarray(s.A), np.asarray(s.B), np.asarray(s.C), np.asarray(s.D))
     return np.asarray(z, dtype=float).reshape(-1, 1)
+
+
+# ---------------------------------------------------------------------------
+# Analysis
+# ---------------------------------------------------------------------------
+
+
+def damp(sys: Any) -> np.ndarray:
+    s = _lti(sys)
+    p = np.roots(np.asarray(s.den).reshape(-1))
+    wn = np.abs(p)
+    z = -np.real(p) / np.where(wn == 0, 1.0, wn)
+    return np.asarray([wn, z]).T
+
+
+def evalfr(sys: Any, s: Any) -> np.ndarray:
+    x = complex(np.asarray(as_array(s)).reshape(-1)[0])
+    s_ = _lti(sys)
+    num = np.asarray(s_.num).reshape(-1)
+    den = np.asarray(s_.den).reshape(-1)
+    val = np.polyval(num, x) / np.polyval(den, x)
+    return np.array([[complex(val)]])
+
+
+def isstable(sys: Any) -> np.ndarray:
+    s = _lti(sys)
+    p = np.roots(np.asarray(s.den).reshape(-1))
+    stable = all(np.real(p) < 0)
+    return np.array([[1.0 if stable else 0.0]])
+
+
+def isproper(sys: Any) -> np.ndarray:
+    if isinstance(sys, TransferFunction):
+        proper = sys.num.size <= sys.den.size
+        return np.array([[1.0 if proper else 0.0]])
+    return np.array([[1.0]])
+
+
+def bandwidth(sys: Any) -> np.ndarray:
+    s = _lti(sys)
+    w, mag, _ = _sig.bode(s)
+    mag = np.asarray(mag)
+    w = np.asarray(w)
+    dc = mag[0]
+    target = dc - 3.0
+    idx = np.flatnonzero(mag <= target)
+    if idx.size == 0:
+        return np.array([[float(w[-1])]])
+    return np.array([[float(w[idx[0]])]])
+
+
+def dcgain2(sys: Any) -> np.ndarray:
+    return dcgain(sys)
+
+
+def tfdata(sys: Any, nout: int = 2) -> Any:
+    num, den = _tf_arrays(sys)
+    if nout >= 2:
+        return num.reshape(1, -1), den.reshape(1, -1)
+    return num.reshape(1, -1)
+
+
+def ssdata(sys: Any, nout: int = 4) -> Any:
+    s = _lti(sys)
+    if isinstance(s, _sig.TransferFunction):
+        s = s.to_ss()
+    A = np.asarray(s.A)
+    B = np.asarray(s.B)
+    C = np.asarray(s.C)
+    D = np.asarray(s.D)
+    return A, B, C, D
+
+
+def tf2ss(num: Any, den: Any) -> Any:
+    A, B, C, D = _sig.tf2ss(np.asarray(as_array(num)).flatten(), np.asarray(as_array(den)).flatten())
+    return A, B, C, D
+
+
+def ss2tf(A: Any, B: Any, C: Any, D: Any) -> Any:
+    num, den = _sig.ss2tf(np.asarray(as_array(A)), np.asarray(as_array(B)), np.asarray(as_array(C)), np.asarray(as_array(D)))
+    return num.reshape(1, -1), den.reshape(1, -1)
+
+
+def tf2zp(num: Any, den: Any) -> Any:
+    z, p, k = _sig.tf2zpk(np.asarray(as_array(num)).flatten(), np.asarray(as_array(den)).flatten())
+    return z.reshape(-1, 1), p.reshape(-1, 1), np.array([[k]])
+
+
+def zp2tf(z: Any, p: Any, k: Any) -> Any:
+    num, den = _sig.zpk2tf(np.asarray(as_array(z)).flatten(), np.asarray(as_array(p)).flatten(), float(scalar_value(k)))
+    return num.reshape(1, -1), den.reshape(1, -1)
+
+
+def ss2zp(A: Any, B: Any, C: Any, D: Any) -> Any:
+    z, p, k = _sig.ss2zpk(np.asarray(as_array(A)), np.asarray(as_array(B)), np.asarray(as_array(C)), np.asarray(as_array(D)))
+    return z.reshape(-1, 1), p.reshape(-1, 1), np.array([[k]])
+
+
+def minreal(sys: Any) -> TransferFunction:
+    num, den = _tf_arrays(sys)
+    num, den = num.astype(float), den.astype(float)
+    while len(num) > 1 and len(den) > 1:
+        r = np.roots(den)
+        changed = False
+        for root in r:
+            if abs(np.polyval(num, root)) < 1e-9:
+                num = np.poly(np.delete(np.roots(num), np.argmin(np.abs(np.roots(num) - root))))
+                den = np.poly(np.delete(np.roots(den), np.argmin(np.abs(np.roots(den) - root))))
+                changed = True
+                break
+        if not changed:
+            break
+    return TransferFunction(np.trim_zeros(num, "f"), np.trim_zeros(den, "f"))
+
+
+def append(*systems: Any) -> TransferFunction:
+    # Append SISO systems on the diagonal of a block-diagonal state-space model.
+    from scipy.linalg import block_diag
+
+    As, Bs, Cs, Ds = [], [], [], []
+    for s in systems:
+        ss = _lti(s)
+        if isinstance(ss, _sig.TransferFunction):
+            ss = ss.to_ss()
+        As.append(np.asarray(ss.A))
+        Bs.append(np.asarray(ss.B))
+        Cs.append(np.asarray(ss.C))
+        Ds.append(np.asarray(ss.D))
+    A = block_diag(*As)
+    B = block_diag(*Bs)
+    C = block_diag(*Cs)
+    D = block_diag(*Ds)
+    num, den = _sig.ss2tf(A, B, C, D)
+    return TransferFunction(num, den)
+
+
+# ---------------------------------------------------------------------------
+# Conversions and discretization
+# ---------------------------------------------------------------------------
+
+
+def c2d(sys: Any, Ts: Any, method: Any = "zoh") -> TransferFunction:
+    num, den = _tf_arrays(sys)
+    Ts = float(scalar_value(Ts))
+    method_map = {"zoh": "zoh", "foh": "foh", "tustin": "bilinear", "bilinear": "bilinear", "matched": "matched"}
+    m = method_map.get(str(method).lower(), "zoh")
+    num_d, den_d, _ = _sig.cont2discrete((num, den), Ts, method=m)
+    return TransferFunction(np.asarray(num_d).flatten(), np.asarray(den_d).flatten())
+
+
+def _bilinear_subst(poly: np.ndarray, Ts: float) -> np.ndarray:
+    """Substitute ``z = (2 + s*Ts) / (2 - s*Ts)`` into a polynomial in ``z``."""
+    n = len(poly) - 1
+    result = np.zeros(n + 1)
+    for k, coef in enumerate(poly):
+        a = np.poly1d([Ts, 2.0]) ** k
+        b = np.poly1d([-Ts, 2.0]) ** (n - k)
+        result = np.polyadd(result, coef * np.polymul(a, b))
+    return result
+
+
+def d2c(sys: Any, Ts: Any = 1.0) -> TransferFunction:
+    """Discrete-to-continuous via the inverse bilinear (Tustin) transform."""
+    num, den = _tf_arrays(sys)
+    Ts = float(scalar_value(Ts))
+    num_c = _bilinear_subst(num, Ts)
+    den_c = _bilinear_subst(den, Ts)
+    return TransferFunction(num_c, den_c)
+
+
+def pid(Kp: Any, Ki: Any = 0, Kd: Any = 0) -> TransferFunction:
+    Kp = float(scalar_value(Kp))
+    Ki = float(scalar_value(Ki))
+    Kd = float(scalar_value(Kd))
+    return TransferFunction([Kd, Kp, Ki], [1.0, 0.0])
+
+
+# ---------------------------------------------------------------------------
+# State-space analysis and design
+# ---------------------------------------------------------------------------
+
+
+def ctrb(A: Any, B: Any) -> np.ndarray:
+    from scipy.signal import ctrb as _ctrb
+
+    return _ctrb(np.asarray(as_array(A)), np.asarray(as_array(B)))
+
+
+def obsv(A: Any, C: Any) -> np.ndarray:
+    from scipy.signal import obsv as _obsv
+
+    return _obsv(np.asarray(as_array(A)), np.asarray(as_array(C)))
+
+
+def lqr(A: Any, B: Any, Q: Any, R: Any) -> np.ndarray:
+    from scipy.signal import lqr as _lqr
+
+    K, _, _ = _lqr(np.asarray(as_array(A)), np.asarray(as_array(B)), np.asarray(as_array(Q)), np.asarray(as_array(R)))
+    return K
+
+
+def dlqr(A: Any, B: Any, Q: Any, R: Any) -> np.ndarray:
+    from scipy.linalg import solve, solve_discrete_are
+
+    A = np.asarray(as_array(A))
+    B = np.asarray(as_array(B))
+    Q = np.asarray(as_array(Q))
+    R = np.asarray(as_array(R))
+    P = solve_discrete_are(A, B, Q, R)
+    K = solve(R + B.T @ P @ B, B.T @ P @ A)
+    return K
+
+
+def place(A: Any, B: Any, p: Any) -> np.ndarray:
+    from scipy.signal import place_poles
+
+    res = place_poles(np.asarray(as_array(A)), np.asarray(as_array(B)), np.asarray(as_array(p)).flatten())
+    return res.gain_matrix
+
+
+def acker(A: Any, B: Any, p: Any) -> np.ndarray:
+    return place(A, B, p)
+
+
+def lyap(A: Any, Q: Any) -> np.ndarray:
+    from scipy.linalg import solve_continuous_lyapunov
+
+    return solve_continuous_lyapunov(np.asarray(as_array(A)), np.asarray(as_array(Q)))
+
+
+def care(A: Any, B: Any, Q: Any, R: Any) -> np.ndarray:
+    from scipy.linalg import solve_continuous_are
+
+    return solve_continuous_are(np.asarray(as_array(A)), np.asarray(as_array(B)), np.asarray(as_array(Q)), np.asarray(as_array(R)))
+
+
+def dare(A: Any, B: Any, Q: Any, R: Any) -> np.ndarray:
+    from scipy.linalg import solve_discrete_are
+
+    return solve_discrete_are(np.asarray(as_array(A)), np.asarray(as_array(B)), np.asarray(as_array(Q)), np.asarray(as_array(R)))
+
+
+# ---------------------------------------------------------------------------
+# Frequency response
+# ---------------------------------------------------------------------------
+
+
+def bode(sys: Any, w: Any = None) -> tuple[np.ndarray, np.ndarray]:
+    s = _lti(sys)
+    if w is None:
+        w, mag, phase = _sig.bode(s)
+    else:
+        w = np.asarray(as_array(w)).flatten()
+        w, mag, phase = _sig.bode(s, w=w)
+    return np.asarray(mag).reshape(-1, 1), np.asarray(phase).reshape(-1, 1)
+
+
+def freqresp(sys: Any, w: Any) -> np.ndarray:
+    s = _lti(sys)
+    w = np.asarray(as_array(w)).flatten()
+    _, h = _sig.freqresp(s, w)
+    return np.asarray(h).reshape(-1, 1)
+
+
+def margin(sys: Any) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    s = _lti(sys)
+    w, mag, phase = _sig.bode(s)
+    w = np.asarray(w)
+    mag = np.asarray(mag)
+    phase = np.asarray(phase)
+    gm = np.inf
+    pm = np.inf
+    wcg = np.nan
+    wcp = np.nan
+    for i in range(len(w) - 1):
+        if phase[i] <= -180 <= phase[i + 1] or phase[i + 1] <= -180 <= phase[i]:
+            wcg = w[i]
+            gm = -mag[i]
+            break
+    for i in range(len(w)):
+        if mag[i] <= 0:
+            pm = 180 + phase[i]
+            wcp = w[i]
+            break
+    return np.array([[gm]]), np.array([[pm]]), np.array([[wcg]]), np.array([[wcp]])
+
+
+def nyquist(sys: Any) -> tuple[np.ndarray, np.ndarray]:
+    s = _lti(sys)
+    w, h = _sig.freqresp(s)
+    return np.asarray(h.real).reshape(-1, 1), np.asarray(h.imag).reshape(-1, 1)
+
+
+def gensig(kind: Any, tau: Any, tfinal: Any, Ts: Any = None) -> tuple[np.ndarray, np.ndarray]:
+    k = str(kind).lower()
+    tfinal = float(scalar_value(tfinal))
+    Ts = float(scalar_value(Ts)) if Ts is not None else tfinal / 1000.0
+    t = np.arange(0, tfinal + Ts, Ts)
+    tau = float(scalar_value(tau))
+    if k in ("sin", "sine"):
+        u = np.sin(2 * np.pi * t / tau)
+    elif k in ("square",):
+        u = _sig.square(2 * np.pi * t / tau)
+    elif k in ("pulse",):
+        u = _sig.square(2 * np.pi * t / tau, duty=0.5)
+    else:
+        u = np.zeros_like(t)
+    return u.reshape(-1, 1), t.reshape(-1, 1)
+
+
+def initial(sys: Any, x0: Any) -> np.ndarray:
+    s = _lti(sys)
+    x0 = np.asarray(as_array(x0)).flatten()
+    _, y, _ = _sig.lsim(s, U=np.zeros(100), T=np.linspace(0, 1, 100), X0=x0)
+    return np.asarray(y).reshape(-1, 1)

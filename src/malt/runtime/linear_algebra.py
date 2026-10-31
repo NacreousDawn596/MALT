@@ -119,3 +119,166 @@ def polyfit(x: Any, y: Any, n: Any) -> np.ndarray:
 
 def pinv(A: Any) -> np.ndarray:
     return np.linalg.pinv(as_array(A))
+
+
+# ---------------------------------------------------------------------------
+# Matrix decompositions and functions
+# ---------------------------------------------------------------------------
+
+
+def schur(A: Any, nout: int = 1) -> Any:
+    from scipy.linalg import schur as _schur
+
+    t, z = _schur(as_array(A), output="real")
+    if nout >= 2:
+        return t, z
+    return t
+
+
+def hess(A: Any) -> np.ndarray:
+    from scipy.linalg import hessenberg
+
+    h, _ = hessenberg(as_array(A), calc_q=False)
+    return h
+
+
+def expm(A: Any) -> np.ndarray:
+    from scipy.linalg import expm as _expm
+
+    return _expm(as_array(A))
+
+
+def logm(A: Any) -> np.ndarray:
+    from scipy.linalg import logm as _logm
+
+    return _logm(as_array(A))
+
+
+def sqrtm(A: Any) -> np.ndarray:
+    from scipy.linalg import sqrtm as _sqrtm
+
+    return _sqrtm(as_array(A))
+
+
+def funm(A: Any, fun: Any) -> np.ndarray:
+    from scipy.linalg import funm as _funm
+
+    a = as_array(A)
+    fn = str(fun).lower()
+    table = {"exp": np.exp, "sin": np.sin, "cos": np.cos, "log": np.log, "sqrt": np.sqrt}
+    if fn in table:
+        return _funm(a, table[fn])
+    return _funm(a, lambda z: np.asarray(fun(np.asarray(z))).item())
+
+
+def null(A: Any) -> np.ndarray:
+    from scipy.linalg import null_space
+
+    return null_space(as_array(A))
+
+
+def orth(A: Any) -> np.ndarray:
+    from scipy.linalg import orth as _orth
+
+    return _orth(as_array(A))
+
+
+def rref(A: Any) -> np.ndarray:
+    a = as_array(A).astype(float)
+    m, n = a.shape
+    r = 0
+    pivots = []
+    for c in range(n):
+        if r >= m:
+            break
+        row = np.argmax(np.abs(a[r:, c])) + r
+        if abs(a[row, c]) < 1e-12:
+            continue
+        a[[r, row]] = a[[row, r]]
+        a[r] = a[r] / a[r, c]
+        for i in range(m):
+            if i != r and abs(a[i, c]) > 1e-12:
+                a[i] = a[i] - a[i, c] * a[r]
+        pivots.append(c)
+        r += 1
+    return a
+
+
+def linsolve(A: Any, B: Any) -> np.ndarray:
+    from scipy.linalg import solve
+
+    return solve(as_array(A), as_array(B))
+
+
+def balance(A: Any) -> np.ndarray:
+    from scipy.linalg import matrix_balance
+
+    b, _ = matrix_balance(as_array(A))
+    return b
+
+
+def rcond(A: Any) -> np.ndarray:
+    return np.array([[1.0 / np.linalg.cond(as_array(A))]])
+
+
+def normest(A: Any) -> np.ndarray:
+    return np.array([[np.linalg.norm(as_array(A), ord=2)]])
+
+
+def condest(A: Any) -> np.ndarray:
+    return cond(A, 1)
+
+
+# ---------------------------------------------------------------------------
+# Structural predicates
+# ---------------------------------------------------------------------------
+
+
+def _square(A: Any) -> np.ndarray:
+    a = as_array(A)
+    if isinstance(a, str):
+        a = np.asarray(a)
+    a = np.atleast_2d(a)
+    return a
+
+
+def issymmetric(A: Any) -> np.ndarray:
+    a = _square(A)
+    r = a.shape[0] == a.shape[1] and np.allclose(a, a.T, atol=1e-12)
+    return np.array([[1.0 if r else 0.0]])
+
+
+def ishermitian(A: Any) -> np.ndarray:
+    a = _square(A)
+    r = a.shape[0] == a.shape[1] and np.allclose(a, a.conj().T, atol=1e-12)
+    return np.array([[1.0 if r else 0.0]])
+
+
+def isdiag(A: Any) -> np.ndarray:
+    a = np.asarray(as_array(A), dtype=float)
+    off = a - np.diag(np.diag(a))
+    return np.array([[1.0 if np.allclose(off, 0, atol=1e-12) else 0.0]])
+
+
+def istril(A: Any) -> np.ndarray:
+    a = np.asarray(as_array(A), dtype=float)
+    return np.array([[1.0 if np.allclose(np.triu(a, 1), 0, atol=1e-12) else 0.0]])
+
+
+def istriu(A: Any) -> np.ndarray:
+    a = np.asarray(as_array(A), dtype=float)
+    return np.array([[1.0 if np.allclose(np.tril(a, -1), 0, atol=1e-12) else 0.0]])
+
+
+def isbanded(A: Any, lower: Any, upper: Any) -> np.ndarray:
+    a = np.asarray(as_array(A), dtype=float)
+    n = a.shape[0]
+    lo = int(scalar_value(lower))
+    up = int(scalar_value(upper))
+    ok = True
+    for i in range(n):
+        for j in range(n):
+            if j - i > up or i - j > lo:
+                if abs(a[i, j]) > 1e-12:
+                    ok = False
+    return np.array([[1.0 if ok else 0.0]])

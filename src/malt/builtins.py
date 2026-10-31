@@ -34,6 +34,55 @@ BUILTINS = frozenset(
         "strjoin", "strsplit", "num2str",
         "tf", "ss", "dcgain", "step", "impulse", "lsim", "stepinfo",
         "feedback", "series", "parallel", "pole", "zero",
+        # Core math (extended)
+        "sec", "csc", "cot", "asec", "acsc", "acot", "sind", "cosd", "tand",
+        "asind", "acosd", "atand", "atan2d", "asinh", "acosh", "atanh",
+        "deg2rad", "rad2deg", "unwrap", "cplxpair", "complex", "cbrt",
+        "realsqrt", "reallog", "hypot", "expm1", "log1p", "nthroot", "power",
+        "idivide", "gcd", "lcm", "factorial", "nchoosek", "perms", "primes",
+        "isprime", "factor", "cummax", "cummin", "diff", "maxk", "mink",
+        "bounds", "range", "rescale", "normalize",
+        # Special functions
+        "gamma", "gammaln", "beta", "betaln", "erf", "erfc", "erfinv",
+        "erfcinv", "psi", "expint", "besselj", "bessely", "besseli", "besselk",
+        "airy", "ellipke", "ellipj", "legendre", "cross", "dot", "cumtrapz",
+        # Arrays and matrices
+        "triu", "tril", "kron", "rot90", "flip", "circshift", "unique", "find",
+        "cat", "horzcat", "vertcat", "sortrows", "issorted", "toeplitz",
+        "hankel", "vander", "hilb", "invhilb", "magic", "pascal", "blkdiag",
+        "repelem", "ndgrid", "squeeze", "permute", "ipermute",
+        # Linear algebra (extended)
+        "schur", "hess", "expm", "logm", "sqrtm", "funm", "null", "orth",
+        "rref", "linsolve", "balance", "rcond", "normest", "condest",
+        "issymmetric", "ishermitian", "isdiag", "istril", "istriu", "isbanded",
+        # Polynomials / interpolation / calculus / ODE / optimization
+        "conv", "deconv", "poly", "polyval", "polyvalm", "polyder", "polyint",
+        "residue", "interp1", "interp2", "interp3", "spline", "pchip", "makima",
+        "gradient", "del2", "trapz", "integral2", "integral3", "fminsearch",
+        "fminbnd", "fsolve", "lsqnonneg", "fminunc", "ode23", "ode113",
+        "ode15s", "ode23s",
+        # Statistics (base)
+        "median", "std", "var", "mad", "skewness", "kurtosis", "mode", "cov",
+        "corrcoef", "prctile", "quantile", "iqr", "movmean", "movmedian",
+        "movsum", "movstd", "movvar", "movmax", "movmin", "detrend",
+        "ismissing", "rmmissing", "fillmissing", "isoutlier", "filloutliers",
+        "rms", "meansqr",
+        # Control systems (extended)
+        "damp", "evalfr", "isstable", "isproper", "bandwidth", "tfdata",
+        "ssdata", "tf2ss", "ss2tf", "tf2zp", "zp2tf", "ss2zp", "minreal",
+        "append", "c2d", "d2c", "pid", "ctrb", "obsv", "lqr", "dlqr", "place",
+        "acker", "lyap", "care", "dare", "bode", "freqresp", "margin",
+        "nyquist", "gensig", "initial",
+        # Signal processing
+        "fft", "ifft", "fft2", "ifft2", "fftn", "ifftn", "fftshift",
+        "ifftshift", "nextpow2", "filter", "filtfilt", "conv2", "medfilt1",
+        "sgolayfilt", "butter", "cheby1", "cheby2", "ellip", "fir1", "freqz",
+        "hilbert", "xcorr", "findpeaks", "resample", "decimate", "upsample",
+        "downsample", "spectrogram", "periodogram", "pwelch",
+        # Sparse
+        "sparse", "full", "speye", "spalloc", "sprand", "sprandn", "spdiags",
+        "nnz", "spy", "gmres", "pcg", "bicg", "bicgstab", "cgs", "minres",
+        "lsqr", "qmr",
     }
 )
 

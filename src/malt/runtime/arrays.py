@@ -426,3 +426,198 @@ def peaks(n: Any = 49) -> np.ndarray:
         - 1 / 3 * np.exp(-((X + 1) ** 2) - Y**2)
     )
     return Z
+
+
+# ---------------------------------------------------------------------------
+# Matrix and array manipulation (MATLAB-compatible subset)
+# ---------------------------------------------------------------------------
+
+
+def triu(A: Any, k: Any = 0) -> np.ndarray:
+    return np.triu(as_array(A), int(_scalar(k)))
+
+
+def tril(A: Any, k: Any = 0) -> np.ndarray:
+    return np.tril(as_array(A), int(_scalar(k)))
+
+
+def kron(A: Any, B: Any) -> np.ndarray:
+    return np.kron(as_array(A), as_array(B))
+
+
+def rot90(A: Any, k: Any = 1) -> np.ndarray:
+    return np.rot90(as_array(A), int(_scalar(k)))
+
+
+def flip(A: Any, dim: Any = None) -> np.ndarray:
+    a = as_array(A)
+    if dim is None:
+        return np.flip(a)
+    return np.flip(a, axis=int(_scalar(dim)) - 1)
+
+
+def circshift(A: Any, k: Any, dim: Any = None) -> np.ndarray:
+    a = as_array(A)
+    k = int(_scalar(k))
+    if dim is None:
+        return np.roll(a, k, axis=0)
+    return np.roll(a, k, axis=int(_scalar(dim)) - 1)
+
+
+def unique(A: Any) -> np.ndarray:
+    a = as_array(A)
+    return np.unique(a).reshape(-1, 1)
+
+
+def find(A: Any) -> np.ndarray:
+    a = as_array(A)
+    idx = np.flatnonzero(a)
+    return (idx + 1).reshape(-1, 1)  # MATLAB is 1-based
+
+
+def cat(dim: Any, *arrays: Any) -> np.ndarray:
+    d = int(_scalar(dim)) - 1
+    return np.concatenate([as_array(a) for a in arrays], axis=d)
+
+
+def horzcat(*arrays: Any) -> np.ndarray:
+    return np.hstack([as_array(a) for a in arrays])
+
+
+def vertcat(*arrays: Any) -> np.ndarray:
+    return np.vstack([as_array(a) for a in arrays])
+
+
+def sortrows(A: Any, col: Any = None) -> np.ndarray:
+    a = np.asarray(as_array(A))
+    c = 0 if col is None else int(_scalar(col)) - 1
+    return a[a[:, c].argsort(kind="stable")]
+
+
+def issorted(A: Any) -> np.ndarray:
+    a = np.asarray(as_array(A)).flatten()
+    return np.array([[1.0 if np.all(np.diff(a) >= 0) else 0.0]])
+
+
+def toeplitz(c: Any, r: Any = None) -> np.ndarray:
+    from scipy.linalg import toeplitz as _t
+
+    c = np.asarray(as_array(c)).flatten()
+    if r is None:
+        r = c
+    else:
+        r = np.asarray(as_array(r)).flatten()
+    return _t(c, r)
+
+
+def hankel(c: Any, r: Any = None) -> np.ndarray:
+    from scipy.linalg import hankel as _h
+
+    c = np.asarray(as_array(c)).flatten()
+    if r is None:
+        r = np.zeros_like(c)
+    else:
+        r = np.asarray(as_array(r)).flatten()
+    return _h(c, r)
+
+
+def vander(v: Any, n: Any = None) -> np.ndarray:
+    v = np.asarray(as_array(v)).flatten()
+    if n is None:
+        return np.vander(v, increasing=False)
+    return np.vander(v, N=int(_scalar(n)), increasing=False)
+
+
+def hilb(n: Any) -> np.ndarray:
+    from scipy.linalg import hilbert
+
+    return hilbert(int(_scalar(n)))
+
+
+def invhilb(n: Any) -> np.ndarray:
+    from scipy.linalg import invhilbert
+
+    return invhilbert(int(_scalar(n)))
+
+
+def magic(n: Any) -> np.ndarray:
+    n = int(_scalar(n))
+    if n == 2:
+        raise RuntimeError_("magic(2) is not defined")
+    if n % 2 == 1:
+        a = np.zeros((n, n))
+        i, j = 0, n // 2
+        for num in range(1, n * n + 1):
+            a[i, j] = num
+            ni, nj = (i - 1) % n, (j + 1) % n
+            if a[ni, nj]:
+                i = (i + 1) % n
+            else:
+                i, j = ni, nj
+        return a
+    if n % 4 == 0:
+        a = np.arange(1, n * n + 1).reshape(n, n)
+        for i in range(n):
+            for j in range(n):
+                if i % 4 in (0, 3) and j % 4 in (0, 3):
+                    a[i, j] = n * n + 1 - a[i, j]
+                elif i % 4 in (1, 2) and j % 4 in (1, 2):
+                    a[i, j] = n * n + 1 - a[i, j]
+        return a
+    # singly-even (n = 4k+2)
+    m = n // 2
+    sub = magic(m)
+    top = np.hstack([sub, sub + 2 * m * m])
+    bot = np.hstack([sub + 3 * m * m, sub + m * m])
+    a = np.vstack([top, bot])
+    return a
+
+
+def pascal(n: Any) -> np.ndarray:
+    n = int(_scalar(n))
+    from scipy.linalg import pascal as _p
+
+    return _p(n, kind="symmetric")
+
+
+def blkdiag(*matrices: Any) -> np.ndarray:
+    from scipy.linalg import block_diag
+
+    return block_diag(*[np.asarray(as_array(m)) for m in matrices])
+
+
+def repelem(A: Any, n: Any) -> np.ndarray:
+    a = np.asarray(as_array(A))
+    n = int(_scalar(n))
+    return np.repeat(a, n, axis=0)
+
+
+def ndgrid(*vectors: Any) -> tuple[np.ndarray, ...]:
+    vs = [np.asarray(as_array(v)).flatten() for v in vectors]
+    grids = np.meshgrid(*vs, indexing="ij")
+    return grids
+
+
+def squeeze(A: Any) -> np.ndarray:
+    a = as_array(A)
+    a = np.squeeze(a)
+    if a.ndim == 0:
+        return a.reshape(1, 1)
+    if a.ndim == 1:
+        return a.reshape(-1, 1)
+    return a
+
+
+def permute(A: Any, order: Any) -> np.ndarray:
+    a = as_array(A)
+    order = tuple(int(x) - 1 for x in np.asarray(as_array(order)).flatten())
+    return np.transpose(a, order)
+
+
+def ipermute(A: Any, order: Any) -> np.ndarray:
+    a = as_array(A)
+    order = tuple(int(x) - 1 for x in np.asarray(as_array(order)).flatten())
+    inverse = [0] * len(order)
+    for i, o in enumerate(order):
+        inverse[o] = i
+    return np.transpose(a, tuple(inverse))
