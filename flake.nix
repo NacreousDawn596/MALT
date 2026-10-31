@@ -49,7 +49,7 @@
         # store (never `$PWD` or the host environment).
         maltPackage = pkgs.stdenv.mkDerivation {
           pname = "malt";
-          version = "0.4.5";
+          version = "0.4.6";
           src = self;
           buildInputs = [ pythonEnv ];
           buildPhase = "true";

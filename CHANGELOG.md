@@ -3,6 +3,12 @@
 All notable changes to MALT are documented here. This project follows
 `major.minor.patch`; within `0.x`, breaking changes bump the minor version.
 
+## [0.4.6] — 2026-10-30
+
+### Fixed
+- The notebook GUI now selects the Matplotlib `QtAgg` backend before importing
+  `pyplot`, avoiding a backend-switch warning on startup.
+
 ## [0.4.5] — 2026-10-30
 
 ### Added
