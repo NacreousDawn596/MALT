@@ -11,6 +11,9 @@ and every workload verifies its numerical output.
 from __future__ import annotations
 
 import os
+import re
+import shutil
+import subprocess
 import sys
 import time
 from contextlib import redirect_stdout
@@ -43,6 +46,30 @@ def run_fixture(name: str) -> dict:
     src = load(name)
     unit = compile_source(src, name)
     return _quiet_execute(unit)
+
+
+def _run_malt_stdout(source: str, filename: str) -> str:
+    unit = compile_source(source, filename)
+    buf = StringIO()
+    with redirect_stdout(buf):
+        execute(unit)
+    return buf.getvalue()
+
+
+def _run_octave(source: str) -> str:
+    proc = subprocess.run(
+        ["octave-cli", "--quiet", "--no-window-system", "--eval", "format long g;" + source],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(f"Octave failed:\n{proc.stderr.strip()}")
+    return proc.stdout
+
+
+def _floats(text: str) -> list[float]:
+    return [float(m) for m in re.findall(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?", text)]
 
 
 # --- compiler-stage timings ----------------------------------------------
@@ -163,6 +190,36 @@ def bench_cold_warm_cache():
     print(measure(warm, 2000, 5, "warm (cache hit)").summarize("us"))
 
 
+def bench_octave_comparison():
+    print("\n-- MALT vs GNU Octave --")
+    if shutil.which("octave-cli") is None:
+        print("octave-cli not found; skipping Octave comparison benchmarks")
+        return
+
+    workloads = [
+        ("scalar loop (100k)", "scalar_loop.m", 5 if QUICK else 10, 2 if QUICK else 5),
+        ("matrix multiply (200x200)", "matrix_operations.m", 5 if QUICK else 10, 2 if QUICK else 5),
+        ("linear solve (2x2)", "linear_solve.m", 200 if QUICK else 500, 3 if QUICK else 8),
+    ]
+
+    for label, name, n_malt, n_octave in workloads:
+        src = load(name)
+        malt_out = _run_malt_stdout(src, name)
+        oct_out = _run_octave(src)
+        np.testing.assert_allclose(
+            _floats(malt_out),
+            _floats(oct_out),
+            atol=1e-8,
+            err_msg=f"{name}: MALT={malt_out!r} OCTAVE={oct_out!r}",
+        )
+        unit = compile_source(src, name)
+        _quiet_execute(unit)
+        m_malt = measure(lambda unit=unit: _quiet_execute(unit), n_malt, 1, f"MALT: {label}")
+        m_oct = measure(lambda src=src: _run_octave(src), n_octave, 0, f"Octave: {label}")
+        print(m_malt.summarize("ms"))
+        print(m_oct.summarize("ms"))
+
+
 def main() -> int:
     t0 = time.perf_counter()
     import matplotlib
@@ -182,6 +239,7 @@ def main() -> int:
     bench_numerical()
     bench_end_to_end()
     bench_cold_warm_cache()
+    bench_octave_comparison()
 
     print(f"\ntotal wall {time.perf_counter() - t0:.2f}s")
     return 0

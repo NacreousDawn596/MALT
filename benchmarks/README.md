@@ -13,7 +13,9 @@ nix develop -c python benchmarks/run.py --quick  # reduced iteration counts
 The harness measures compiler stages (lexing, parsing, semantic analysis, code
 generation, full compilation — both uncached and cached), scalar/runtime
 workloads, numerical workloads (matmul, element-wise, linear solve), and
-end-to-end cold/warm/repeated execution. Every workload validates its result
+end-to-end cold/warm/repeated execution. When `octave-cli` is installed, it
+also benchmarks equivalent fixture workloads against GNU Octave and validates
+that numeric outputs match before timing. Every workload validates its result
 before timing.
 
 ## Fixtures
